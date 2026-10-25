@@ -107,3 +107,16 @@ func TestOfferFieldsAreValidated(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestValidPrefixCharacterBoundaries(t *testing.T) {
+	for _, ok := range []string{"0", "9", "A", "Z", "a", "z"} {
+		if !ValidPrefix(ok) {
+			t.Fatalf("%q must be valid", ok)
+		}
+	}
+	for _, bad := range []string{"/", ":", "@", "[", "`", "{"} {
+		if ValidPrefix(bad) {
+			t.Fatalf("%q must be invalid", bad)
+		}
+	}
+}
