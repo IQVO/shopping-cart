@@ -1,6 +1,6 @@
 // Package kafka holds the outbound Kafka adapters. The outbox relay publishes
 // through the Writer built here; the topic is chosen per message, never on the
-// Writer, so one Writer serves the events and analytics topics.
+// Writer, so one Writer serves events and analytics topics.
 package kafka
 
 import (

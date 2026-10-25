@@ -42,7 +42,7 @@ func (r *CartRepository) ListByShopper(ctx context.Context, shopperID string, st
 	defer r.s.enter(ctx)()
 	var snaps []cart.Snapshot
 	for _, s := range r.s.carts {
-		if s.ShopperID == shopperID && (state == "" || s.State == state) {
+		if shopperID != "" && s.ShopperID == shopperID && (state == "" || s.State == state) {
 			snaps = append(snaps, s)
 		}
 	}
