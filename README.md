@@ -4,7 +4,7 @@ Storefront (e-commerce) domain of the retail-network organisation, bounded conte
 
 Holds a shopper's intent: cart lines, the destination postal prefix, the delivery quote delivery-promise returned for the cart (per shipment group, with its offers and expiry), the shopper's tier selection per group, and a labelled, non-binding estimate (effective prices + selected tier charges + tax band) so the total cost is visible up front [1].
 
-Status: under construction. The design lives in [warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/) `storefront/model/model.yaml` (single source of truth).
+Status: built to the model (domain, application, Postgres, Kafka, REST, BDD); the PR is awaiting review. The design lives in [warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/) `storefront/model/model.yaml` (single source of truth).
 This repository is part of the storefront domain: it consumes the retail network's Open Host Service routes and its
 published `retailnetwork.*` events; it never calls an in-org or restricted network route.
 
