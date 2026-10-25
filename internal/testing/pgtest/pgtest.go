@@ -146,6 +146,20 @@ func NewPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
+// ExecOn runs one statement on the database behind dsn (a URL or NewPool
+// database): test support that backdates rows the clock-driven policies read.
+func ExecOn(t *testing.T, dsn, sql string, args ...any) {
+	t.Helper()
+	pool, err := postgres.NewPool(context.Background(), dsn)
+	if err != nil {
+		t.Fatalf("pool: %v", err)
+	}
+	defer pool.Close()
+	if _, err := pool.Exec(context.Background(), sql, args...); err != nil {
+		t.Fatalf("exec %q: %v", sql, err)
+	}
+}
+
 // WaitAllPublished fails the test unless every outbox row has been published
 // within a few seconds.
 func WaitAllPublished(t *testing.T, pool *pgxpool.Pool) {
