@@ -48,6 +48,12 @@ type AddLine struct{ Deps }
 // Execute adds the item, merging quantities when the cart already holds it.
 // Purchasability is the lenient PurchasabilityView rule (decision H3).
 func (u AddLine) Execute(ctx context.Context, cartID, catalogItemID string, quantity int) (views.Cart, error) {
+	v, err := u.add(ctx, cartID, catalogItemID, quantity)
+	u.recordOutcome(ctx, err)
+	return v, err
+}
+
+func (u AddLine) add(ctx context.Context, cartID, catalogItemID string, quantity int) (views.Cart, error) {
 	return u.mutate(ctx, cartID, func(ctx context.Context, c *cart.Cart) error {
 		item, err := u.Items.Get(ctx, catalogItemID)
 		if err != nil && !isNotFound(err) {
