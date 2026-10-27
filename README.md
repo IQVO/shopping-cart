@@ -11,6 +11,14 @@ published `retailnetwork.*` events; it never calls an in-org or restricted netwo
 Runtime: Go, hexagonal, real PostgreSQL and Kafka only (`DATABASE_URL`, `KAFKA_BROKERS` are mandatory), CloudEvents 1.0 on every message
 (`com.retailnetwork.storefront.shopping-cart.<entity>.<Event>`), transactional outbox.
 
+## Observability
+
+Logs are JSON on stdout (`LOG_LEVEL`) with `trace_id`/`span_id` when a span is active. Traces and metrics leave over OTLP/gRPC to
+`OTEL_EXPORTER_OTLP_ENDPOINT` (default the in-cluster Collector; export never blocks the service), named by `OTEL_SERVICE_NAME`
+(default `shopping-cart`), `SERVICE_VERSION` and `ENVIRONMENT`. Every request has a server span and a request-log line sharing a trace id;
+the outbox carries `traceparent` into Kafka and each consumer continues the trace. Business metric: `cart.lines.added`
+(`outcome`, `reason`). See [ADR 0005](docs/adr/0005-fleet-observability-standard.md).
+
 ## Disclaimer
 
 This project is a domain-driven design study. It is not associated with, endorsed by or affiliated with any company, and it uses no company's code, data, logos or trademarks. All names, figures and examples are illustrative or synthetic.
