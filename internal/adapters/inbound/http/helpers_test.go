@@ -3,6 +3,7 @@ package http_test
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -28,7 +29,11 @@ type env struct {
 	keys   int
 }
 
-func newEnv(t *testing.T) *env {
+func newEnv(t *testing.T) *env { return newEnvLogged(t, slog.New(slog.DiscardHandler)) }
+
+// newEnvLogged is newEnv with the router's request logger set (newEnv discards
+// it so the access lines do not flood the test output).
+func newEnvLogged(t *testing.T, logger *slog.Logger) *env {
 	t.Helper()
 	clock := memory.NewClock(t0)
 	s := memory.NewStore(clock)
@@ -46,7 +51,7 @@ func newEnv(t *testing.T) *env {
 		AcceptRequotedOffers: usecases.AcceptRequotedOffers{Deps: deps}, GetCart: usecases.GetCart{Deps: deps},
 		ListCarts: usecases.ListCarts{Deps: deps}, IdempotencyStore: s.Idempotency(), Clock: clock, Readiness: ready,
 	}
-	srv := httptest.NewServer(httpadapter.NewRouter(api))
+	srv := httptest.NewServer(httpadapter.NewRouter(api, logger, ""))
 	t.Cleanup(srv.Close)
 	return &env{t: t, store: s, clock: clock, quoter: quoter, deps: deps, ready: ready, srv: srv}
 }
