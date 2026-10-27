@@ -1,0 +1,28 @@
+{{ .Chart.Name }} has been deployed.
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+
+Service:   {{ include "shopping-cart.fullname" . }} ({{ .Values.service.type }}, port {{ .Values.service.port }})
+
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+Ingress:   http://{{ .host }}{{ (index .paths 0).path }}
+{{- end }}
+{{- else if .Values.gatewayApi.enabled }}
+Gateway API HTTPRoute enabled - routed via the parentRefs/hosts configured in gatewayApi.*.
+{{- else }}
+To reach it locally:
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "shopping-cart.fullname" . }} 8080:{{ .Values.service.port }}
+  curl http://localhost:8080/healthz
+{{- end }}
+
+Cart analytics events are relayed from the transactional outbox onto
+retailnetwork.shopping-cart.analytics ({{ .Values.kafka.brokers }}).
+Postgres and Kafka are the only runtime; delivery offers are quoted through
+delivery-promise at {{ .Values.deliveryPromise.url }}.
+
+The three consumers are ON under stable group ids:
+  offer-availability  group {{ .Values.config.offerAvailabilityConsumerGroup }}, topic retailnetwork.offer-availability.events
+  pricing             group {{ .Values.config.pricingConsumerGroup }}, topic retailnetwork.pricing.events
+  checkout            group {{ .Values.config.checkoutConsumerGroup }}, topic retailnetwork.checkout.events
