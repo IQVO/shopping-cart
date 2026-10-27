@@ -1,0 +1,166 @@
+{{- include "shopping-cart.requireRealRuntime" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shopping-cart.fullname" . }}
+  labels:
+    {{- include "shopping-cart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  {{- if not .Values.autoscaling.api.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "shopping-cart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "shopping-cart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "shopping-cart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "shopping-cart.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          # Every non-secret config.* value also reaches cmd/api through the
+          # chart ConfigMap; the explicit `env` entries below win over envFrom
+          # for the same key and carry the same values. The checksum/config
+          # annotation above rolls the pods when the ConfigMap changes.
+          # tests/render_test.sh asserts the mount and that every variable
+          # cmd/api reads is rendered.
+          envFrom:
+            - configMapRef:
+                name: {{ include "shopping-cart.fullname" . }}
+          # The env contract is cmd/api/main.go's header comment. A value with a
+          # dedicated chart key is rendered here, never through extraEnv.
+          env:
+            - name: HTTP_ADDR
+              value: {{ .Values.config.httpAddr | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            # The three consumers always run. The group ids come from values,
+            # never literals and never the pod name, and are mandatory (the
+            # chart refuses an empty one): stable ids are what make a
+            # rescheduled pod resume from its committed offsets.
+            - name: OFFER_AVAILABILITY_CONSUMER_GROUP
+              value: {{ .Values.config.offerAvailabilityConsumerGroup | quote }}
+            - name: PRICING_CONSUMER_GROUP
+              value: {{ .Values.config.pricingConsumerGroup | quote }}
+            - name: CHECKOUT_CONSUMER_GROUP
+              value: {{ .Values.config.checkoutConsumerGroup | quote }}
+            # Mandatory: the cart quotes delivery offers through
+            # delivery-promise; cmd/api exits at boot without it.
+            - name: DELIVERY_PROMISE_URL
+              value: {{ .Values.deliveryPromise.url | quote }}
+            {{- if ne (toString .Values.deliveryPromise.timeout) "" }}
+            - name: DELIVERY_PROMISE_TIMEOUT
+              value: {{ .Values.deliveryPromise.timeout | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.config.cartCurrency) "" }}
+            # The estimate currency when no priced item states one (default USD).
+            - name: CART_CURRENCY
+              value: {{ .Values.config.cartCurrency | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.config.abandonSweepInterval) "" }}
+            # How often the AbandonInactive sweep runs (default 1h).
+            - name: ABANDON_SWEEP_INTERVAL
+              value: {{ .Values.config.abandonSweepInterval | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.config.purgeSweepInterval) "" }}
+            # How often the PurgeAbandonedCarts sweep runs (default 6h).
+            - name: PURGE_SWEEP_INTERVAL
+              value: {{ .Values.config.purgeSweepInterval | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.config.outboxRelayInterval) "" }}
+            - name: OUTBOX_RELAY_INTERVAL
+              value: {{ .Values.config.outboxRelayInterval | quote }}
+            {{- end }}
+            # The relay excludes a row after this many failures (0 = unlimited).
+            - name: OUTBOX_MAX_ATTEMPTS
+              value: {{ .Values.config.outboxMaxAttempts | quote }}
+            {{- if ne (toString .Values.config.shutdownDrainDelay) "" }}
+            - name: SHUTDOWN_DRAIN_DELAY
+              value: {{ .Values.config.shutdownDrainDelay | quote }}
+            {{- end }}
+            # DATABASE_URL always comes from a Secret.
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "shopping-cart.databaseSecretName" . }}
+                  key: {{ .Values.database.existingSecretKey }}
+            {{- if .Values.database.migrationsExistingSecretKey }}
+            # A direct (non-pooled) DSN used only for the boot migrations.
+            # `optional: true` so a Secret without this key still starts the
+            # pod: the binary falls back to DATABASE_URL.
+            - name: MIGRATIONS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "shopping-cart.databaseSecretName" . }}
+                  key: {{ .Values.database.migrationsExistingSecretKey }}
+                  optional: true
+            {{- end }}
+            # Mandatory: the relay, the consumers and /readyz dial Kafka.
+            - name: KAFKA_BROKERS
+              value: {{ .Values.kafka.brokers | quote }}
+            {{- range .Values.extraEnv }}
+            - {{ toYaml . | nindent 14 | trim }}
+            {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          # The service writes nothing to disk and the root filesystem is
+          # read-only; /tmp is a small scratch volume for the runtime.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
