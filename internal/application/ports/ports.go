@@ -130,3 +130,18 @@ type IDGenerator interface {
 	// NewCartID mints the id of a new cart.
 	NewCartID() string
 }
+
+// CartMetrics records the business outcome of every AddLine attempt (Tier 2 of
+// the fleet metrics convention). The use case calls it once per attempt:
+// LineAdded when the line was stored (a merged quantity counts), LineRejected
+// otherwise, with the problem slug that says why (the `type` suffix the REST
+// adapter answers with: "item-not-purchasable", "quantity-out-of-range", ...).
+// The implementation lives in internal/adapters/outbound/telemetry; a nil
+// Deps.Metrics records nothing.
+type CartMetrics interface {
+	// LineAdded counts a line that was added to a cart.
+	LineAdded(ctx context.Context)
+	// LineRejected counts an AddLine that stored nothing; reason is a stable,
+	// low-cardinality slug.
+	LineRejected(ctx context.Context, reason string)
+}
