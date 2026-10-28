@@ -198,3 +198,12 @@ terminationGracePeriodSeconds: 80
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# Observability (fleet standard): pod --OTLP/gRPC--> Collector --> Jaeger
+# (traces) and Prometheus (metrics). Export never blocks; otel.enabled=false
+# renders no OTEL_* env at all (the binary then falls back to localhost:4317).
+# SERVICE_VERSION is the image tag (appVersion when empty).
+otel:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4317"
+  serviceName: "shopping-cart"

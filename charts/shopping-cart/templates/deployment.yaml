@@ -62,6 +62,14 @@ spec:
               value: {{ .Values.config.httpAddr | quote }}
             - name: LOG_LEVEL
               value: {{ .Values.config.logLevel | quote }}
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.otel.serviceName | quote }}
+            {{- end }}
             # The three consumers always run. The group ids come from values,
             # never literals and never the pod name, and are mandatory (the
             # chart refuses an empty one): stable ids are what make a
