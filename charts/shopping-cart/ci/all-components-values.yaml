@@ -1,0 +1,37 @@
+# Used by `helm lint` / `ct lint`: every optional value and component set at
+# once (api + HPA + gateway + ingress + every optional config.* value).
+database:
+  url: "postgres://u@example.invalid:5432/db"
+  migrationsUrl: "postgres://u@example.invalid:5432/direct"
+  existingSecretKey: "DATABASE_URL"
+  migrationsExistingSecretKey: "MIGRATIONS_DATABASE_URL"
+kafka:
+  brokers: "kafka.example.invalid:9092"
+deliveryPromise:
+  url: "http://delivery-promise.example.invalid:8080"
+  timeout: "3s"
+config:
+  logLevel: "debug"
+  cartCurrency: "USD"
+  abandonSweepInterval: "30m"
+  purgeSweepInterval: "3h"
+  outboxRelayInterval: "2s"
+  outboxMaxAttempts: 20
+  shutdownDrainDelay: "5s"
+  offerAvailabilityConsumerGroup: "shopping-cart-offer-availability"
+  pricingConsumerGroup: "shopping-cart-pricing"
+  checkoutConsumerGroup: "shopping-cart-checkout"
+autoscaling:
+  api:
+    enabled: true
+ingress:
+  enabled: true
+gatewayApi:
+  enabled: true
+  parentRefs:
+    - name: warehouse-gateway
+      namespace: kong
+      sectionName: http
+  hosts:
+    - path: /api/shopping-cart
+      pathType: PathPrefix

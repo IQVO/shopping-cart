@@ -1,0 +1,14 @@
+# Used by `helm lint` / `ct lint` (chart-testing): the chart refuses to render
+# without the mandatory values (database source, Kafka brokers, the delivery-
+# promise URL and the three consumer groups). Dummy values, no password;
+# nothing here is ever dialled.
+database:
+  url: "postgres://u@example.invalid:5432/db"
+kafka:
+  brokers: "kafka.example.invalid:9092"
+deliveryPromise:
+  url: "http://delivery-promise.example.invalid:8080"
+config:
+  offerAvailabilityConsumerGroup: "shopping-cart-offer-availability"
+  pricingConsumerGroup: "shopping-cart-pricing"
+  checkoutConsumerGroup: "shopping-cart-checkout"

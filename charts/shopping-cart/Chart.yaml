@@ -1,0 +1,12 @@
+apiVersion: v2
+name: shopping-cart
+description: Shopping cart - cart lines, delivery quotes and a labelled cost estimate; consumes offer-availability, pricing and checkout events and publishes cart analytics events from the transactional outbox on retailnetwork.shopping-cart.analytics
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+home: https://github.com/IQVO/shopping-cart
+keywords:
+  - ddd
+  - hexagonal-architecture
+  - retail-network
+  - golang

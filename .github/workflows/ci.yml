@@ -228,6 +228,35 @@ jobs:
       - name: govulncheck
         run: govulncheck ./...
 
+  # Lint only on PRs (chart-testing compares against the target branch);
+  # the behaviour tests below run on every push.
+  # ============================================================
+  # CLASSIFICATION: PACKAGING (Helm chart lint)
+  # ============================================================
+  helm-lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: v3.16.4
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.x"
+          check-latest: true
+      - uses: helm/chart-testing-action@720270857a28afd41e2426521a7801db09e9b510 # v2.9.0
+      - name: Run chart-testing (lint)
+        run: ct lint --charts charts/shopping-cart --validate-maintainers=false --check-version-increment=false
+      - name: helm lint with each ci values file (standalone renders)
+        run: |
+          set -euo pipefail
+          helm lint charts/shopping-cart -f charts/shopping-cart/ci/default-values.yaml
+          helm lint charts/shopping-cart -f charts/shopping-cart/ci/all-components-values.yaml
+
   # ============================================================
   # CLASSIFICATION: PACKAGING (Helm chart tests)
   # Runs on EVERY push and PR (unlike helm-lint): the chart tests guard
