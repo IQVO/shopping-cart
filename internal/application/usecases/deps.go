@@ -36,6 +36,9 @@ type Deps struct {
 	// Log receives anomalies that are acknowledged, not failed (a closed or
 	// unknown cart named by CheckoutCompleted). Nil discards them.
 	Log *slog.Logger
+	// Metrics records the business outcome of each AddLine; nil records
+	// nothing, so unit tests need no wiring.
+	Metrics ports.CartMetrics
 }
 
 const (
@@ -47,6 +50,20 @@ const (
 )
 
 func (d Deps) now() time.Time { return d.Clock.Now().UTC() }
+
+// metrics returns the configured CartMetrics or a no-op.
+func (d Deps) metrics() ports.CartMetrics {
+	if d.Metrics != nil {
+		return d.Metrics
+	}
+	return noMetrics{}
+}
+
+// noMetrics is the CartMetrics of a Deps without one.
+type noMetrics struct{}
+
+func (noMetrics) LineAdded(context.Context)            {}
+func (noMetrics) LineRejected(context.Context, string) {}
 
 func (d Deps) publish(ctx context.Context, events []shared.Event) error {
 	if err := d.Outbox.Append(ctx, events...); err != nil {

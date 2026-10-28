@@ -76,7 +76,7 @@ func (w *world) api() *httptest.Server {
 			SelectDelivery: usecases.SelectDelivery{Deps: d}, MergeInto: usecases.MergeInto{Deps: d},
 			AcceptRequotedOffers: usecases.AcceptRequotedOffers{Deps: d}, GetCart: usecases.GetCart{Deps: d}, ListCarts: usecases.ListCarts{Deps: d},
 			IdempotencyStore: w.store.Idempotency(), Clock: d.Clock,
-		}))
+		}, nil, ""))
 	}
 	return w.srv
 }
