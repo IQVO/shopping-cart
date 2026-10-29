@@ -1,0 +1,1025 @@
+asyncapi: 3.0.0
+info:
+  title: shopping-cart Domain Events
+  version: 1.0.0
+  contact:
+    name: shopping-cart maintainers
+    url: https://github.com/IQVO/shopping-cart
+    email: shopping-cart@iqvo.example.com
+  license:
+    name: UNLICENSED
+  tags:
+  - name: shopping-cart
+    description: The shopping-cart bounded context (retail network, storefront tier).
+  - name: cart
+    description: Events raised by the Cart aggregate.
+  - name: consumed
+    description: Events produced by other contexts that this service consumes (ADR 0003).
+  description: 'Event catalog for the **shopping-cart** bounded context of the storefront (Supporting subdomain): a shopper''s held intent, the
+    delivery quote and selections, and the labelled non-binding estimate (ADR 0001, ADR 0002).
+
+
+    **Published.** Four events on `retailnetwork.shopping-cart.analytics`, all analytics-only (decision H1: removal, quantity changes and merge
+    raise none): `CartLineAdded`, `CartDeliveryQuoted`, `CartAbandoned`, `CartCheckedOut`. They go through a **transactional outbox**; an always-on
+    relay drains them to Kafka, at-least-once. The types are catalogued in ADR 0004.
+
+
+    **Consumed.** `CatalogItemCreated`, `CatalogItemDiscontinued` (offer-availability); `ItemPriceChanged`, `ItemPriceWithdrawn`, `DeliveryChargeScheduleChanged`,
+    `TaxTableChanged` (pricing); `CheckoutCompleted` (checkout). They feed the local read models PurchasabilityView and EstimateView and run the
+    policy CloseOnCheckoutCompleted. The messages list only the fields this service relies on; the producer''s own AsyncAPI file is authoritative
+    and unknown fields are ignored. Consumer group names come from mandatory environment variables.
+
+
+    **Envelope (mandatory).** CloudEvents 1.0, structured content mode, Kafka header `content-type: application/cloudevents+json; charset=UTF-8`.
+    `specversion`, `id`, `source` (`/retailnetwork/shopping-cart`), `type`, `subject` (the cartId), `time`, `datacontenttype` (`application/json`)
+    and `dataschema` (`urn:retailnetwork:shopping-cart:analytics:<EventName>:v1`) are all required. Kafka key = the subject. Type = `com.retailnetwork.storefront.shopping-cart.cart.<EventName>`.
+    A breaking payload change is a new `.v2` type, never a mutation. Dispatch on the full `type`, ignore unknown types, dedupe on `id`.
+
+
+    **Conventions.** `data` is camelCase; instants are RFC 3339 UTC; enums are UPPER_SNAKE.'
+servers:
+  production:
+    host: '{brokers}'
+    protocol: kafka
+    description: Retail-network Kafka broker (host supplied by the deployment environment via KAFKA_BROKERS).
+    variables:
+      brokers:
+        default: kafka.retail-network.internal:9092
+defaultContentType: application/cloudevents+json
+channels:
+  cartAnalytics:
+    address: retailnetwork.shopping-cart.analytics
+    title: shopping-cart analytics topic
+    description: 'This service''s ONLY topic: all four published events are analytics-only. Written by the outbox relay; key = the cartId. Every
+      message carries the CloudEvents content-type header.'
+    messages:
+      CartLineAdded:
+        $ref: '#/components/messages/CartLineAdded'
+      CartDeliveryQuoted:
+        $ref: '#/components/messages/CartDeliveryQuoted'
+      CartAbandoned:
+        $ref: '#/components/messages/CartAbandoned'
+      CartCheckedOut:
+        $ref: '#/components/messages/CartCheckedOut'
+  offerAvailabilityEvents:
+    address: retailnetwork.offer-availability.events
+    title: offer-availability integration topic (consumed)
+    description: Produced by offer-availability (Conformist). Consumer group from OFFER_AVAILABILITY_CONSUMER_GROUP. Idempotent on the CloudEvents
+      id (inbox), dispatch on the full type, dead-letter on poison messages.
+    messages:
+      CatalogItemCreated:
+        $ref: '#/components/messages/ConsumedCatalogItemCreated'
+      CatalogItemDiscontinued:
+        $ref: '#/components/messages/ConsumedCatalogItemDiscontinued'
+  pricingEvents:
+    address: retailnetwork.pricing.events
+    title: pricing integration topic (consumed)
+    description: Produced by pricing (Customer/Supplier). Consumer group from PRICING_CONSUMER_GROUP.
+    messages:
+      ItemPriceChanged:
+        $ref: '#/components/messages/ConsumedItemPriceChanged'
+      ItemPriceWithdrawn:
+        $ref: '#/components/messages/ConsumedItemPriceWithdrawn'
+      DeliveryChargeScheduleChanged:
+        $ref: '#/components/messages/ConsumedDeliveryChargeScheduleChanged'
+      TaxTableChanged:
+        $ref: '#/components/messages/ConsumedTaxTableChanged'
+  checkoutEvents:
+    address: retailnetwork.checkout.events
+    title: checkout integration topic (consumed)
+    description: Produced by checkout (Customer/Supplier). Consumer group from CHECKOUT_CONSUMER_GROUP.
+    messages:
+      CheckoutCompleted:
+        $ref: '#/components/messages/ConsumedCheckoutCompleted'
+operations:
+  publishCartAnalytics:
+    action: send
+    title: Publish cart events
+    summary: Publish CartLineAdded, CartDeliveryQuoted, CartAbandoned and CartCheckedOut through the transactional outbox.
+    description: The service sends the events of the Cart aggregate to `retailnetwork.shopping-cart.analytics`. Consumers route on the full `type`.
+    tags:
+    - name: cart
+    channel:
+      $ref: '#/channels/cartAnalytics'
+    messages:
+    - $ref: '#/channels/cartAnalytics/messages/CartLineAdded'
+    - $ref: '#/channels/cartAnalytics/messages/CartDeliveryQuoted'
+    - $ref: '#/channels/cartAnalytics/messages/CartAbandoned'
+    - $ref: '#/channels/cartAnalytics/messages/CartCheckedOut'
+  receiveOfferAvailabilityEvents:
+    action: receive
+    title: Receive offer-availability events
+    summary: Consume CatalogItemCreated and CatalogItemDiscontinued.
+    description: Feeds PurchasabilityView. See ADR 0003.
+    tags:
+    - name: consumed
+    channel:
+      $ref: '#/channels/offerAvailabilityEvents'
+    messages:
+    - $ref: '#/channels/offerAvailabilityEvents/messages/CatalogItemCreated'
+    - $ref: '#/channels/offerAvailabilityEvents/messages/CatalogItemDiscontinued'
+  receivePricingEvents:
+    action: receive
+    title: Receive pricing events
+    summary: Consume ItemPriceChanged, ItemPriceWithdrawn, DeliveryChargeScheduleChanged and TaxTableChanged.
+    description: Feeds PurchasabilityView and EstimateView. See ADR 0003.
+    tags:
+    - name: consumed
+    channel:
+      $ref: '#/channels/pricingEvents'
+    messages:
+    - $ref: '#/channels/pricingEvents/messages/ItemPriceChanged'
+    - $ref: '#/channels/pricingEvents/messages/ItemPriceWithdrawn'
+    - $ref: '#/channels/pricingEvents/messages/DeliveryChargeScheduleChanged'
+    - $ref: '#/channels/pricingEvents/messages/TaxTableChanged'
+  receiveCheckoutEvents:
+    action: receive
+    title: Receive checkout events
+    summary: Consume CheckoutCompleted.
+    description: Runs the policy CloseOnCheckoutCompleted. See ADR 0003.
+    tags:
+    - name: consumed
+    channel:
+      $ref: '#/channels/checkoutEvents'
+    messages:
+    - $ref: '#/channels/checkoutEvents/messages/CheckoutCompleted'
+components:
+  messages:
+    CartLineAdded:
+      name: CartLineAdded
+      title: A line was added to a cart.
+      summary: A line was added to a cart.
+      description: '`type` = `com.retailnetwork.storefront.shopping-cart.cart.CartLineAdded`; subject and key = the cartId. Raised by AddLine
+        in the same transaction as the outbox row; `quantity` is the MERGED line quantity (adding an item already in the cart merges quantities,
+        there is no duplicate error). Removal, quantity changes, destination, selection and merge raise nothing, by design (decision H1). Analytics
+        only.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: cart
+      payload:
+        $ref: '#/components/schemas/CartLineAddedEvent'
+      examples:
+      - name: cartLineAdded
+        summary: Two more bottles were added; the line now holds 3.
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/shopping-cart
+          type: com.retailnetwork.storefront.shopping-cart.cart.CartLineAdded
+          subject: cart-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shopping-cart:analytics:CartLineAdded:v1
+          data:
+            cartId: cart-100234
+            catalogItemId: cat-100234
+            quantity: 3
+            at: '2026-10-25T14:03:11Z'
+    CartDeliveryQuoted:
+      name: CartDeliveryQuoted
+      title: Delivery offers were quoted for a cart.
+      summary: Delivery offers were quoted for a cart.
+      description: '`type` = `com.retailnetwork.storefront.shopping-cart.cart.CartDeliveryQuoted`; subject and key = the cartId. Raised by QuoteDelivery
+        after delivery-promise answered. Carries no offer detail: a quote holds no capacity. Analytics only.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: cart
+      payload:
+        $ref: '#/components/schemas/CartDeliveryQuotedEvent'
+      examples:
+      - name: cartDeliveryQuoted
+        summary: A two-group quote for prefix 787.
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/shopping-cart
+          type: com.retailnetwork.storefront.shopping-cart.cart.CartDeliveryQuoted
+          subject: cart-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shopping-cart:analytics:CartDeliveryQuoted:v1
+          data:
+            cartId: cart-100234
+            destinationPostalPrefix: '787'
+            groupCount: 2
+            at: '2026-10-25T14:04:00Z'
+    CartAbandoned:
+      name: CartAbandoned
+      title: An idle cart was abandoned.
+      summary: An idle cart was abandoned.
+      description: '`type` = `com.retailnetwork.storefront.shopping-cart.cart.CartAbandoned`; subject and key = the cartId. Raised by the policy
+        AbandonInactive for an OPEN cart with no change for 30 days. The abandoned cart is deleted by the policy PurgeAbandonedCarts 30 days later,
+        which raises no event. Analytics only.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: cart
+      payload:
+        $ref: '#/components/schemas/CartAbandonedEvent'
+      examples:
+      - name: cartAbandoned
+        summary: A cart idle since 24 September.
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/shopping-cart
+          type: com.retailnetwork.storefront.shopping-cart.cart.CartAbandoned
+          subject: cart-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shopping-cart:analytics:CartAbandoned:v1
+          data:
+            cartId: cart-100234
+            lastChangedAt: '2026-09-24T09:00:00Z'
+    CartCheckedOut:
+      name: CartCheckedOut
+      title: A cart was checked out.
+      summary: A cart was checked out.
+      description: '`type` = `com.retailnetwork.storefront.shopping-cart.cart.CartCheckedOut`; subject and key = the cartId. Raised by the policy
+        CloseOnCheckoutCompleted when checkout reports CheckoutCompleted. Analytics only.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: cart
+      payload:
+        $ref: '#/components/schemas/CartCheckedOutEvent'
+      examples:
+      - name: cartCheckedOut
+        summary: Checkout session sess-9001 completed.
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/shopping-cart
+          type: com.retailnetwork.storefront.shopping-cart.cart.CartCheckedOut
+          subject: cart-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:shopping-cart:analytics:CartCheckedOut:v1
+          data:
+            cartId: cart-100234
+            checkoutSessionId: sess-9001
+            at: '2026-10-25T14:20:00Z'
+    ConsumedCatalogItemCreated:
+      name: ConsumedCatalogItemCreated
+      title: CatalogItemCreated
+      summary: CatalogItemCreated
+      description: Produced by offer-availability. Marks the item catalogued in PurchasabilityView. Only `catalogItemId` is read; unknown fields
+        are ignored.
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/CatalogItemCreatedEvent'
+      examples:
+      - name: catalogItemCreated
+        summary: CatalogItemCreated
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated
+          subject: cat-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:CatalogItemCreated:v1
+          data:
+            catalogItemId: cat-100234
+            title: Steel bottle
+    ConsumedCatalogItemDiscontinued:
+      name: ConsumedCatalogItemDiscontinued
+      title: CatalogItemDiscontinued
+      summary: CatalogItemDiscontinued
+      description: 'Produced by offer-availability. Marks the item discontinued in PurchasabilityView (terminal): it can no longer be added to
+        a cart. Lines already held stay; checkout''s price quote is the gate (decision H3).'
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/CatalogItemDiscontinuedEvent'
+      examples:
+      - name: catalogItemDiscontinued
+        summary: CatalogItemDiscontinued
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/offer-availability
+          type: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued
+          subject: cat-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:offer-availability:events:CatalogItemDiscontinued:v1
+          data:
+            catalogItemId: cat-100234
+    ConsumedItemPriceChanged:
+      name: ConsumedItemPriceChanged
+      title: ItemPriceChanged
+      summary: ItemPriceChanged
+      description: Produced by pricing. Records the item's effective price in PurchasabilityView/EstimateView, applied only when `version` is
+        above the last applied price version.
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/ItemPriceChangedEvent'
+      examples:
+      - name: itemPriceChanged
+        summary: ItemPriceChanged
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged
+          subject: cat-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:ItemPriceChanged:v1
+          data:
+            catalogItemId: cat-100234
+            currency: USD
+            listPriceMinor: 1500
+            effectivePriceMinor: 1000
+            version: 7
+    ConsumedItemPriceWithdrawn:
+      name: ConsumedItemPriceWithdrawn
+      title: ItemPriceWithdrawn
+      summary: ItemPriceWithdrawn
+      description: Produced by pricing. Clears the item's price (version-guarded); an unpriced item is not purchasable.
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/ItemPriceWithdrawnEvent'
+      examples:
+      - name: itemPriceWithdrawn
+        summary: ItemPriceWithdrawn
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn
+          subject: cat-100234
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:ItemPriceWithdrawn:v1
+          data:
+            catalogItemId: cat-100234
+            version: 8
+    ConsumedDeliveryChargeScheduleChanged:
+      name: ConsumedDeliveryChargeScheduleChanged
+      title: DeliveryChargeScheduleChanged
+      summary: DeliveryChargeScheduleChanged
+      description: Produced by pricing. Replaces the current delivery charge schedule when `version` is above the stored one.
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/DeliveryChargeScheduleChangedEvent'
+      examples:
+      - name: deliveryChargeScheduleChanged
+        summary: DeliveryChargeScheduleChanged
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged
+          subject: sched-1
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:DeliveryChargeScheduleChanged:v1
+          data:
+            scheduleId: sched-1
+            version: 3
+            tiers:
+            - tier: STANDARD
+              chargeMinor: 500
+              freeOverMinor: 5000
+            - tier: NEXT_DAY
+              chargeMinor: 1200
+    ConsumedTaxTableChanged:
+      name: ConsumedTaxTableChanged
+      title: TaxTableChanged
+      summary: TaxTableChanged
+      description: Produced by pricing. Replaces the current tax table when `version` is above the stored one.
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/TaxTableChangedEvent'
+      examples:
+      - name: taxTableChanged
+        summary: TaxTableChanged
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/pricing
+          type: com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged
+          subject: tax-1
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:pricing:events:TaxTableChanged:v1
+          data:
+            taxTableId: tax-1
+            version: 2
+            bands:
+            - postalPrefixFrom: '700'
+              postalPrefixTo: '799'
+              rateBasisPoints: 825
+    ConsumedCheckoutCompleted:
+      name: ConsumedCheckoutCompleted
+      title: CheckoutCompleted
+      summary: CheckoutCompleted
+      description: 'Produced by checkout (not built yet: the shape is the model''s). The cart named by `cartId` becomes CHECKED_OUT and CartCheckedOut
+        is raised. An unknown or non-OPEN cart is acknowledged and logged.'
+      contentType: application/cloudevents+json
+      tags:
+      - name: consumed
+      payload:
+        $ref: '#/components/schemas/CheckoutCompletedEvent'
+      examples:
+      - name: checkoutCompleted
+        summary: CheckoutCompleted
+        payload:
+          specversion: '1.0'
+          id: 7d2e9c41-5f6b-4a3e-9c2d-1e8f0a5b6c7d
+          source: /retailnetwork/checkout
+          type: com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted
+          subject: sess-9001
+          time: '2026-10-25T14:03:11Z'
+          datacontenttype: application/json
+          dataschema: urn:retailnetwork:checkout:events:CheckoutCompleted:v1
+          data:
+            cartId: cart-100234
+            sessionId: sess-9001
+  schemas:
+    Instant:
+      type: string
+      format: date-time
+      description: RFC 3339 instant in UTC.
+    CartLineAddedData:
+      type: object
+      required:
+      - cartId
+      - catalogItemId
+      - quantity
+      - at
+      properties:
+        cartId: &id001
+          type: string
+        catalogItemId: *id001
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+          description: The merged line quantity.
+        at:
+          $ref: '#/components/schemas/Instant'
+    CartDeliveryQuotedData:
+      type: object
+      required:
+      - cartId
+      - destinationPostalPrefix
+      - groupCount
+      - at
+      properties:
+        cartId: *id001
+        destinationPostalPrefix:
+          type: string
+          description: A postal prefix, never an address.
+        groupCount:
+          type: integer
+          minimum: 0
+        at:
+          $ref: '#/components/schemas/Instant'
+    CartAbandonedData:
+      type: object
+      required:
+      - cartId
+      - lastChangedAt
+      properties:
+        cartId: *id001
+        lastChangedAt:
+          $ref: '#/components/schemas/Instant'
+    CartCheckedOutData:
+      type: object
+      required:
+      - cartId
+      - checkoutSessionId
+      - at
+      properties:
+        cartId: *id001
+        checkoutSessionId: *id001
+        at:
+          $ref: '#/components/schemas/Instant'
+    CatalogItemData:
+      type: object
+      required:
+      - catalogItemId
+      properties:
+        catalogItemId: *id001
+    ItemPriceChangedData:
+      type: object
+      required:
+      - catalogItemId
+      - currency
+      - effectivePriceMinor
+      - version
+      properties:
+        catalogItemId: *id001
+        currency:
+          type: string
+          pattern: ^[A-Z]{3}$
+        effectivePriceMinor:
+          type: integer
+          minimum: 0
+        version:
+          type: integer
+          minimum: 1
+      description: Only the fields the cart reads are listed; pricing's own file is authoritative.
+    ItemPriceWithdrawnData:
+      type: object
+      required:
+      - catalogItemId
+      - version
+      properties:
+        catalogItemId: *id001
+        version:
+          type: integer
+          minimum: 1
+    DeliveryChargeScheduleChangedData:
+      type: object
+      required:
+      - version
+      - tiers
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        tiers:
+          type: array
+          items:
+            type: object
+            required:
+            - tier
+            - chargeMinor
+            properties:
+              tier:
+                type: string
+                enum:
+                - SAME_DAY
+                - NEXT_DAY
+                - TWO_DAY
+                - STANDARD
+              chargeMinor:
+                type: integer
+                minimum: 0
+              freeOverMinor:
+                type: integer
+                minimum: 0
+                description: Optional free-over threshold; omitted or 0 means none.
+    TaxTableChangedData:
+      type: object
+      required:
+      - version
+      - bands
+      properties:
+        version:
+          type: integer
+          minimum: 1
+        bands:
+          type: array
+          items:
+            type: object
+            required:
+            - postalPrefixFrom
+            - postalPrefixTo
+            - rateBasisPoints
+            properties:
+              postalPrefixFrom: *id001
+              postalPrefixTo: *id001
+              rateBasisPoints:
+                type: integer
+                minimum: 0
+    CheckoutCompletedData:
+      type: object
+      required:
+      - cartId
+      - sessionId
+      properties:
+        cartId: *id001
+        sessionId: *id001
+    CartLineAddedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/shopping-cart
+        type:
+          type: string
+          const: com.retailnetwork.storefront.shopping-cart.cart.CartLineAdded
+        subject:
+          type: string
+          description: The cartId; also the Kafka message key.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:shopping-cart:analytics:CartLineAdded:v1
+        data:
+          $ref: '#/components/schemas/CartLineAddedData'
+    CartDeliveryQuotedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/shopping-cart
+        type:
+          type: string
+          const: com.retailnetwork.storefront.shopping-cart.cart.CartDeliveryQuoted
+        subject:
+          type: string
+          description: The cartId; also the Kafka message key.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:shopping-cart:analytics:CartDeliveryQuoted:v1
+        data:
+          $ref: '#/components/schemas/CartDeliveryQuotedData'
+    CartAbandonedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/shopping-cart
+        type:
+          type: string
+          const: com.retailnetwork.storefront.shopping-cart.cart.CartAbandoned
+        subject:
+          type: string
+          description: The cartId; also the Kafka message key.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:shopping-cart:analytics:CartAbandoned:v1
+        data:
+          $ref: '#/components/schemas/CartAbandonedData'
+    CartCheckedOutEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/shopping-cart
+        type:
+          type: string
+          const: com.retailnetwork.storefront.shopping-cart.cart.CartCheckedOut
+        subject:
+          type: string
+          description: The cartId; also the Kafka message key.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:shopping-cart:analytics:CartCheckedOut:v1
+        data:
+          $ref: '#/components/schemas/CartCheckedOutData'
+    CatalogItemCreatedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/offer-availability
+        type:
+          type: string
+          const: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated
+        subject:
+          type: string
+          description: The catalogItemId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:offer-availability:events:CatalogItemCreated:v1
+        data:
+          $ref: '#/components/schemas/CatalogItemData'
+    CatalogItemDiscontinuedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/offer-availability
+        type:
+          type: string
+          const: com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued
+        subject:
+          type: string
+          description: The catalogItemId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:offer-availability:events:CatalogItemDiscontinued:v1
+        data:
+          $ref: '#/components/schemas/CatalogItemData'
+    ItemPriceChangedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged
+        subject:
+          type: string
+          description: The catalogItemId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:ItemPriceChanged:v1
+        data:
+          $ref: '#/components/schemas/ItemPriceChangedData'
+    ItemPriceWithdrawnEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn
+        subject:
+          type: string
+          description: The catalogItemId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:ItemPriceWithdrawn:v1
+        data:
+          $ref: '#/components/schemas/ItemPriceWithdrawnData'
+    DeliveryChargeScheduleChangedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged
+        subject:
+          type: string
+          description: The scheduleId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:DeliveryChargeScheduleChanged:v1
+        data:
+          $ref: '#/components/schemas/DeliveryChargeScheduleChangedData'
+    TaxTableChangedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/pricing
+        type:
+          type: string
+          const: com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged
+        subject:
+          type: string
+          description: The taxTableId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:pricing:events:TaxTableChanged:v1
+        data:
+          $ref: '#/components/schemas/TaxTableChangedData'
+    CheckoutCompletedEvent:
+      type: object
+      required:
+      - specversion
+      - id
+      - source
+      - type
+      - subject
+      - time
+      - datacontenttype
+      - dataschema
+      - data
+      properties:
+        specversion:
+          type: string
+          const: '1.0'
+        id:
+          type: string
+          description: CloudEvents id (UUID); stable across relay retries. Consumers dedupe on it (inbox).
+        source:
+          type: string
+          const: /retailnetwork/checkout
+        type:
+          type: string
+          const: com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted
+        subject:
+          type: string
+          description: The checkout sessionId.
+        time:
+          $ref: '#/components/schemas/Instant'
+        datacontenttype:
+          type: string
+          const: application/json
+        dataschema:
+          type: string
+          const: urn:retailnetwork:checkout:events:CheckoutCompleted:v1
+        data:
+          $ref: '#/components/schemas/CheckoutCompletedData'

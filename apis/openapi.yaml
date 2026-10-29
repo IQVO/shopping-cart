@@ -1,0 +1,663 @@
+openapi: 3.0.3
+info:
+  title: Shopping Cart API
+  version: 0.1.0
+  contact:
+    name: shopping-cart maintainers
+    url: https://github.com/IQVO/shopping-cart
+  description: >-
+    REST contract of the shopping-cart bounded context of the digital
+    storefront, derived from storefront/model/model.yaml
+    (contexts[shopping-cart].rest) and the FINAL model-gap decisions
+    (H1-H6 and checkout H10). The cart holds a
+    shopper's intent: lines, destination postal prefix, the delivery quote
+    delivery-promise returned for the cart (per shipment group, with offers
+    and expiry), the shopper's tier selection per group, and a labelled,
+    non-binding estimate (effective prices + selected tier charges + tax
+    band) so the total cost is visible up front. Without a destination the
+    estimate shows the item subtotal only and estimateComplete is false.
+    One line per item; adding an existing item merges quantities. Any line or destination change
+    clears the quote and the selections. Errors are RFC 9457 problem details
+    (application/problem+json) whose type is /problems/<slug>; shared types
+    are not-found (404), illegal-transition (409), concurrent-update (409)
+    and validation-failed (422), plus one kebab-case slug per Err of the
+    model. Every write takes an Idempotency-Key header. No authentication;
+    shopperId is optional (guest-first).
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Carts
+    description: Cart lifecycle and reads (Cart aggregate).
+  - name: Lines
+    description: Cart lines (one per item, quantity 1..99).
+  - name: Delivery
+    description: Destination, delivery quote and per-group tier selection.
+paths:
+  /carts:
+    post:
+      tags: [Carts]
+      operationId: createCart
+      summary: Create a cart
+      description: CreateCart. shopperId is optional (guest-first, D4); a guest cart can be merged into a shopper's cart later.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopperId:
+                  type: string
+      responses:
+        '201':
+          description: The created cart (OPEN).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+    get:
+      tags: [Carts]
+      operationId: listCarts
+      summary: List carts of a shopper
+      description: ListCarts, filtered by shopperId and optionally state.
+      parameters:
+        - name: shopperId
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/CartState'
+      responses:
+        '200':
+          description: The matching carts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CartList'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /carts/{cartId}:
+    get:
+      tags: [Carts]
+      operationId: getCart
+      summary: Get a cart with its quote, selections and estimate
+      description: >-
+        GetCart. Includes the CheckoutReadiness view (every group selected,
+        no offer expired) and the labelled, non-binding estimate. Called by
+        the BFF and, at checkout session open, by checkout.
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+      responses:
+        '200':
+          description: The cart.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /carts/{cartId}/lines:
+    post:
+      tags: [Lines]
+      operationId: addCartLine
+      summary: Add a line to the cart (merges into an existing line of the item)
+      description: >-
+        AddLine. One line per item: adding an item already in the cart merges
+        quantities; nothing is ever rejected as a duplicate.
+        Clears the current delivery quote and selections. Publishes
+        CartLineAdded (analytics).
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LineInput'
+      responses:
+        '200':
+          description: The updated cart.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: validation-failed, quantity-out-of-range (ErrQuantityOutOfRange), too-many-lines (ErrTooManyLines) or item-not-purchasable (ErrItemNotPurchasable).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /carts/{cartId}/lines/{catalogItemId}:set-quantity:
+    post:
+      tags: [Lines]
+      operationId: setCartLineQuantity
+      summary: Set the quantity of a cart line
+      description: SetLineQuantity. Clears the current delivery quote and selections.
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/CatalogItemId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+                  maximum: 99
+      responses:
+        '200':
+          description: The updated cart.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: validation-failed or quantity-out-of-range (ErrQuantityOutOfRange).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /carts/{cartId}/lines/{catalogItemId}:remove:
+    post:
+      tags: [Lines]
+      operationId: removeCartLine
+      summary: Remove a cart line
+      description: RemoveLine. Clears the current delivery quote and selections.
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/CatalogItemId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The updated cart.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /carts/{cartId}:set-destination:
+    post:
+      tags: [Delivery]
+      operationId: setCartDestination
+      summary: Set the destination postal prefix
+      description: SetDestination. Clears the current delivery quote and selections.
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [destinationPostalPrefix]
+              properties:
+                destinationPostalPrefix:
+                  type: string
+                  minLength: 1
+      responses:
+        '200':
+          description: The updated cart.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /carts/{cartId}:quote-delivery:
+    post:
+      tags: [Delivery]
+      operationId: quoteCartDelivery
+      summary: Quote delivery offers for the cart
+      description: >-
+        QuoteDelivery. Calls delivery-promise POST /delivery-offers:quote
+        (network OHS) synchronously and stores the returned quote: groups with
+        their lines and offers (offerId, tier, window, expiresAt) plus the
+        unavailable tiers. The quote holds no capacity. Publishes
+        CartDeliveryQuoted (analytics).
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: The cart with its fresh delivery quote.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: no-destination (ErrNoDestination) or validation-failed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '503':
+          description: delivery-promise unreachable or timed out (delivery-promise-unavailable). Retry with the same Idempotency-Key.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /carts/{cartId}:select-delivery:
+    post:
+      tags: [Delivery]
+      operationId: selectCartDelivery
+      summary: Select a delivery offer for a shipment group
+      description: >-
+        SelectDelivery. The selection must name an offer of the current quote
+        (ErrStaleDeliverySelection).
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [groupNo, offerId]
+              properties:
+                groupNo:
+                  type: integer
+                  minimum: 1
+                offerId:
+                  type: string
+      responses:
+        '200':
+          description: The updated cart.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: stale-delivery-selection (ErrStaleDeliverySelection), cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+  /carts/{cartId}:merge-into:
+    post:
+      tags: [Carts]
+      operationId: mergeCartInto
+      summary: Merge this cart into another OPEN cart of the same shopper
+      description: MergeInto. The source cart becomes MERGED; the target must be OPEN, belong to the same shopper and never be the cart itself (ErrMergeTarget).
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetCartId]
+              properties:
+                targetCartId:
+                  type: string
+      responses:
+        '200':
+          description: The target cart after the merge.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: merge-target (ErrMergeTarget) or validation-failed.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+  /carts/{cartId}/delivery/requoted:
+    post:
+      tags: [Delivery]
+      operationId: acceptRequotedOffers
+      summary: Write the offers of a checkout requote into the cart
+      description: >-
+        AcceptRequotedOffers. Checkout reports REQUOTE_REQUIRED with the
+        requotedOffers it obtained for the groups it had selected; the BFF
+        writes them here. The supplied set REPLACES the cart's delivery
+        quote (one offer per group) and each offer is the selection of its
+        group, WITHOUT calling delivery-promise. A group keeps the lineNos
+        of the previous quote's group of the same number (a single-group
+        quote spans every line). Lines and destination are untouched.
+        Checkout re-verifies every offer with its pre-authorize check, so
+        nothing is trusted here. Publishes nothing.
+      parameters:
+        - $ref: '#/components/parameters/CartId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offers]
+              properties:
+                offers:
+                  type: array
+                  minItems: 1
+                  items:
+                    $ref: '#/components/schemas/QuotedOffer'
+      responses:
+        '200':
+          description: The updated cart with the requoted selection.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cart'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: cart-closed (ErrCartClosed) or concurrent-update.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+        '422':
+          description: validation-failed (empty set, two offers for one group, a repeated offerId, an invalid tier or timestamp).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: A repeated key returns the stored response of the first call.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    CartId:
+      name: cartId
+      in: path
+      required: true
+      schema:
+        type: string
+    CatalogItemId:
+      name: catalogItemId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    NotFound:
+      description: not-found.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    Unprocessable:
+      description: validation-failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          description: Problem type slug, for example stale-delivery-selection.
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+    Tier:
+      type: string
+      enum: [SAME_DAY, NEXT_DAY, TWO_DAY, STANDARD]
+    CartState:
+      type: string
+      enum: [OPEN, CHECKED_OUT, ABANDONED, MERGED]
+    CartLine:
+      type: object
+      required: [catalogItemId, quantity]
+      properties:
+        catalogItemId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+    LineInput:
+      type: object
+      required: [catalogItemId, quantity]
+      properties:
+        catalogItemId:
+          type: string
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 99
+    QuotedOffer:
+      type: object
+      required: [offerId, groupNo, tier, deliverByEarliest, deliverByLatest, expiresAt]
+      properties:
+        offerId:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+        tier:
+          $ref: '#/components/schemas/Tier'
+        deliverByEarliest:
+          type: string
+          format: date
+        deliverByLatest:
+          type: string
+          format: date
+        expiresAt:
+          type: string
+          format: date-time
+    QuoteGroup:
+      type: object
+      required: [groupNo, lineNos, offers]
+      properties:
+        groupNo:
+          type: integer
+          minimum: 1
+        lineNos:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotedOffer'
+    TierUnavailable:
+      type: object
+      required: [tier, constraint]
+      properties:
+        tier:
+          $ref: '#/components/schemas/Tier'
+        constraint:
+          type: string
+        groupNo:
+          type: integer
+          minimum: 1
+    DeliveryQuote:
+      type: object
+      required: [groups, unavailableTiers, quotedAt]
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuoteGroup'
+        unavailableTiers:
+          type: array
+          items:
+            $ref: '#/components/schemas/Tier'
+        unavailable:
+          type: array
+          description: The unavailable tiers with the constraint delivery-promise reported.
+          items:
+            $ref: '#/components/schemas/TierUnavailable'
+        quotedAt:
+          type: string
+          format: date-time
+    DeliverySelection:
+      type: object
+      required: [groupNo, offerId]
+      properties:
+        groupNo:
+          type: integer
+          minimum: 1
+        offerId:
+          type: string
+    Estimate:
+      type: object
+      required: [currency, itemsMinor, deliveryMinor, taxMinor, totalMinor, estimateComplete]
+      description: The labelled, non-binding total shown in the cart; the binding total is the checkout session's PriceQuote.
+      properties:
+        currency:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        itemsMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        deliveryMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        taxMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        totalMinor:
+          type: integer
+          format: int64
+          minimum: 0
+        estimateComplete:
+          type: boolean
+          description: >-
+            False while the destination is unset, a line has no effective
+            price, or the schedule or tax band is unknown: the figures then
+            cover only what is known (item subtotal first).
+    CheckoutReadiness:
+      type: object
+      required: [ready, allGroupsSelected, noOfferExpired]
+      properties:
+        ready:
+          type: boolean
+        allGroupsSelected:
+          type: boolean
+        noOfferExpired:
+          type: boolean
+    Cart:
+      type: object
+      required: [cartId, state, lines, version]
+      properties:
+        cartId:
+          type: string
+        shopperId:
+          type: string
+          nullable: true
+        state:
+          $ref: '#/components/schemas/CartState'
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/CartLine'
+        destinationPostalPrefix:
+          type: string
+          nullable: true
+        deliveryQuote:
+          $ref: '#/components/schemas/DeliveryQuote'
+        selections:
+          type: array
+          items:
+            $ref: '#/components/schemas/DeliverySelection'
+        estimate:
+          $ref: '#/components/schemas/Estimate'
+        checkoutReadiness:
+          $ref: '#/components/schemas/CheckoutReadiness'
+        version:
+          type: integer
+          minimum: 1
+    CartList:
+      type: object
+      required: [carts]
+      properties:
+        carts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cart'
