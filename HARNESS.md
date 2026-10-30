@@ -70,6 +70,13 @@ already-lived incident, not a hypothetical:
 - **TestMCPAdapterDependencyRule** (conditional, only if `cmd/mcp` exists)
   — ADR-0008: MCP servers are additive inbound adapters. Nothing may
   depend on the MCP package; it may depend only on application+domain.
+- **TestA2AAdapterDependencyRule / TestA2ASurfaceIsReadOnly** (`a2a_fitness_test.go`,
+  + `TestA2ASensorBites`) — ADR-0006: the A2A agent is an additive, READ-ONLY inbound
+  adapter. It depends only on application+domain, nothing depends on it, and the adapter
+  and `cmd/a2a` may reference only an allowlist of use cases/ports (`GetCart`, `ListCarts`,
+  `Deps`, `ErrNotFound`) and import no write-side, event, REST or outbound A2A client
+  package. shopping-cart has no MCP charter to inherit a write from, so a new write is
+  refused by default.
 - **TestNoAuthMiddlewareReintroduced** — encodes the fleet-wide
   2026-09-11 static-bearer-auth revert. An agent "helpfully" re-adding
   auth middleware fails CI instead of shipping unreviewed.
