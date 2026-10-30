@@ -1,5 +1,7 @@
 # shopping-cart
 
+[![CI](https://github.com/IQVO/shopping-cart/actions/workflows/ci.yml/badge.svg?branch=develop)](https://github.com/IQVO/shopping-cart/actions/workflows/ci.yml?query=branch%3Adevelop) [![coverage gate](https://img.shields.io/badge/coverage%20gate-90%25-brightgreen)](https://github.com/IQVO/shopping-cart/blob/develop/Makefile) [![Go](https://img.shields.io/badge/go-1.27.3-00ADD8?logo=go&logoColor=white)](https://github.com/IQVO/shopping-cart/blob/develop/go.mod) [![release](https://img.shields.io/github/v/release/IQVO/shopping-cart?sort=semver)](https://github.com/IQVO/shopping-cart/releases) [![docs](https://img.shields.io/badge/docs-iqvo.github.io-blue)](https://iqvo.github.io/shopping-cart/) [![license](https://img.shields.io/badge/license-MIT-blue)](https://github.com/IQVO/shopping-cart/blob/develop/LICENSE)
+
 Storefront (e-commerce) domain of the retail-network organisation, bounded context **Shopping Cart** (Supporting, storefront tier).
 
 Holds a shopper's intent: cart lines, the destination postal prefix, the delivery quote delivery-promise returned for the cart (per shipment group, with its offers and expiry), the shopper's tier selection per group, and a labelled, non-binding estimate (effective prices + selected tier charges + tax band) so the total cost is visible up front [1].
