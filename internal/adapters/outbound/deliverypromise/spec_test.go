@@ -58,6 +58,20 @@ func TestTheSpecCopyDeclaresTheRouteWeCall(t *testing.T) {
 	}
 }
 
+// The gateway reads window.timeZone (ADR 0007); the contract must declare it
+// and keep it optional, so offers quoted before it existed stay valid.
+func TestTheSpecCopyDeclaresTheOptionalWindowTimeZone(t *testing.T) {
+	def := loadSpec(t).Components.Schemas["DeliveryWindow"]
+	if _, ok := def.Properties["timeZone"]; !ok {
+		t.Fatal("DeliveryWindow does not declare timeZone")
+	}
+	for _, k := range def.Required {
+		if k == "timeZone" {
+			t.Fatal("timeZone must stay optional")
+		}
+	}
+}
+
 func TestExampleSatisfiesTheSpec(t *testing.T) {
 	s := loadSpec(t)
 	var resp map[string]any

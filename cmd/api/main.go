@@ -174,8 +174,9 @@ func buildAdapters(ctx context.Context, rt runtimeEnv, logger *slog.Logger) (ada
 	ad.deps = usecases.Deps{
 		Carts: postgres.NewCartRepository(pool), Items: postgres.NewItemRepository(pool),
 		Schedules: postgres.NewScheduleRepository(pool), TaxTables: postgres.NewTaxTableRepository(pool),
-		Quoter: deliverypromise.New(rt.deliveryPromiseURL, &http.Client{Timeout: rt.deliveryPromiseTimeout}, ad.clock.Now),
-		Inbox:  postgres.NewInbox(pool), Outbox: outbox, UoW: postgres.NewUnitOfWork(pool),
+		Quoter: deliverypromise.New(rt.deliveryPromiseURL, &http.Client{Timeout: rt.deliveryPromiseTimeout}, ad.clock.Now,
+			deliverypromise.WithLogger(logger)),
+		Inbox: postgres.NewInbox(pool), Outbox: outbox, UoW: postgres.NewUnitOfWork(pool),
 		Clock: ad.clock, IDs: ad.ids, Currency: rt.currency, Log: logger,
 	}
 	return ad, pool.Close, nil
