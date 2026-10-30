@@ -1,0 +1,135 @@
+{{- if .Values.a2a.enabled }}
+{{- include "shopping-cart.requireA2aPort" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "shopping-cart.a2aFullname" . }}
+  labels:
+    {{- include "shopping-cart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: a2a
+spec:
+  replicas: {{ .Values.a2a.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "shopping-cart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: a2a
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "shopping-cart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: a2a
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "shopping-cart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: a2a
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "shopping-cart.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["/app/a2a"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.a2a.service.targetPort }}
+              protocol: TCP
+          # The env contract is cmd/a2a/main.go's header comment. This
+          # Deployment deliberately does NOT mount the api ConfigMap: the
+          # agent is read-only (ADR 0006), so it has no Kafka, no outbox, no
+          # consumers, no schedulers and no delivery-promise client, and none of
+          # those variables may reach it (tests/render_test.sh asserts it).
+          env:
+            - name: A2A_ADDR
+              value: {{ .Values.a2a.httpAddr | quote }}
+            # MANDATORY: the absolute URL advertised on the Agent Card.
+            # Defaults to this release's in-cluster Service DNS and is
+            # overridable through a2a.agentUrl.
+            - name: A2A_AGENT_URL
+              value: {{ .Values.a2a.agentUrl | default (printf "http://%s.%s.svc.cluster.local:%v/" (include "shopping-cart.a2aFullname" .) .Release.Namespace .Values.a2a.service.port) | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.config.logLevel | quote }}
+            - name: SERVICE_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+            {{- if .Values.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.otel.endpoint | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ printf "%s-a2a" .Values.otel.serviceName | quote }}
+            {{- end }}
+            {{- if ne (toString .Values.config.cartCurrency) "" }}
+            # The estimate currency when no priced item states one: the SAME
+            # value as the api, so both surfaces answer the same estimate.
+            - name: CART_CURRENCY
+              value: {{ .Values.config.cartCurrency | quote }}
+            {{- end }}
+            # MANDATORY: the same Postgres as the api (read side).
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "shopping-cart.databaseSecretName" . }}
+                  key: {{ .Values.database.existingSecretKey }}
+            {{- if .Values.database.migrationsExistingSecretKey }}
+            # cmd/a2a applies the embedded migrations on start like the api
+            # (idempotent; advisory-locked), so it needs the same direct DSN.
+            # `optional: true`: the binary falls back to DATABASE_URL.
+            - name: MIGRATIONS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "shopping-cart.databaseSecretName" . }}
+                  key: {{ .Values.database.migrationsExistingSecretKey }}
+                  optional: true
+            {{- end }}
+          # GET /healthz is served by cmd/a2a, so the probes have a cheap target.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.a2a.resources | nindent 12 }}
+          # The agent writes nothing to disk and the root filesystem is
+          # read-only; /tmp is a small scratch volume for the runtime.
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

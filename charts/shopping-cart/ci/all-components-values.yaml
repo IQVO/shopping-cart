@@ -1,5 +1,5 @@
 # Used by `helm lint` / `ct lint`: every optional value and component set at
-# once (api + HPA + gateway + ingress + every optional config.* value).
+# once (api + a2a + HPA + gateway + ingress + every optional config.* value).
 database:
   url: "postgres://u@example.invalid:5432/db"
   migrationsUrl: "postgres://u@example.invalid:5432/direct"
@@ -35,3 +35,11 @@ gatewayApi:
   hosts:
     - path: /api/shopping-cart
       pathType: PathPrefix
+a2a:
+  enabled: true
+  route:
+    enabled: true
+    parentRefs:
+      - name: warehouse-gateway
+        namespace: kong
+        sectionName: http
