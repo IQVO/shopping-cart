@@ -28,9 +28,10 @@ func (g *Gateway) toQuote(resp quoteResponse, lines []cart.Line) cart.DeliveryQu
 			continue
 		}
 		grp := ensure(o.GroupNo)
+		loc := g.zones.location(o.Window.TimeZone)
 		grp.Offers = append(grp.Offers, cart.QuotedOffer{
 			OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: cart.Tier(o.Tier),
-			DeliverByEarliest: o.Window.Earliest.UTC().Format(cart.DateLayout), DeliverByLatest: o.Window.Latest.UTC().Format(cart.DateLayout),
+			DeliverByEarliest: o.Window.Earliest.In(loc).Format(cart.DateLayout), DeliverByLatest: o.Window.Latest.In(loc).Format(cart.DateLayout),
 			ExpiresAt: o.ExpiresAt.UTC(),
 		})
 		for _, l := range o.Lines {

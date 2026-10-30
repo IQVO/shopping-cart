@@ -26,3 +26,15 @@ service and database. Holds a shopper's intent: cart lines, the destination post
 ## Consequences
 
 Relationships and the full consumed-event list are in the model and in the AsyncAPI contract added with the first feature PR.
+
+## ADR index
+
+| ADR | Title | Status |
+|---|---|---|
+| [0001](./0001-shopping-cart-bounded-context.md) | Shopping Cart is a bounded context of the storefront domain | Accepted (bootstrap) |
+| [0002](./0002-shopping-cart-assumptions.md) | Aggregates, invariants and assumptions | Accepted (2026-10-25), amended (2026-10-30) |
+| [0003](./0003-consumed-contracts-and-local-read-model.md) | Consumed contracts and the local read models | Accepted (2026-10-25) |
+| [0004](./0004-cloudevents-envelope-and-type-catalogue.md) | CloudEvents envelope and type catalogue | Accepted (2026-10-25) |
+| [0005](./0005-fleet-observability-standard.md) | Adopt the fleet observability standard (logs, metrics, traces) | Accepted (2026-10-26) |
+| [0006](./0006-a2a-inbound-adapter.md) | A2A inbound adapter (read-only agent) | Accepted (2026-10-30) |
+| [0007](./0007-delivery-dates-in-the-destinations-local-calendar.md) | Delivery dates are days of the destination's local calendar | Accepted (2026-10-30) |
