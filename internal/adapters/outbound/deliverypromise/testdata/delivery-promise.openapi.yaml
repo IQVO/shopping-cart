@@ -428,6 +428,11 @@ components:
         latest:
           type: string
           format: date-time
+        timeZone:
+          type: string
+          description: IANA time-zone name of the delivery station that serves the destination (for example
+            America/Chicago). The window's days are days of this zone's calendar. Optional; offers quoted before
+            the field existed omit it.
     WitnessPath:
       type: object
       description: 'The node, pickup departure, departure legs and delivery wave that prove feasibility. A NOMINAL
