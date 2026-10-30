@@ -100,6 +100,13 @@ the model and the decisions are silent. Each is also reported as a `model_gap`.
 - **A17 Timestamps.** Truncated to the microsecond Postgres stores, so a round trip
   never changes an instant.
 
+## Amendment (2026-10-30): local delivery dates
+
+- **A18 Local delivery dates.** Supersedes the "`deliverBy*` are the UTC dates of the
+  offer window" clause of A14: `deliverBy*` are the days of the destination's local
+  calendar, in the IANA zone delivery-promise names on the window (`timeZone`), UTC when
+  it names none or an unusable one (ADR 0007). The rest of A14 stands.
+
 ## Consequences
 
 - The aggregate rejects with typed errors; the HTTP adapter maps each to the problem
