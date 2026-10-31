@@ -1,0 +1,1 @@
+{"parameters":[{"name":"shopperId","in":"query","required":true,"schema":{"type":"string"}},{"name":"state","in":"query","required":false,"schema":{"type":"string","enum":["OPEN","CHECKED_OUT","ABANDONED","MERGED"],"title":"CartState"}}]}

@@ -1,0 +1,70 @@
+---
+id: accept-requoted-offers
+title: "Write the offers of a checkout requote into the cart"
+description: "AcceptRequotedOffers. Checkout reports REQUOTE_REQUIRED with the requotedOffers it obtained for the groups it had selected; the BFF writes them here. The supplied set REPLACES the cart's delivery quote (one offer per group) and each offer is the selection of its group, WITHOUT calling delivery-promise. A group keeps the lineNos of the previous quote's group of the same number (a single-group quote spans every line). Lines and destination are untouched. Checkout re-verifies every offer with its pre-authorize check, so nothing is trusted here. Publishes nothing."
+sidebar_label: "Write the offers of a checkout requote into the cart"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/shopping-cart-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Write the offers of a checkout requote into the cart"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/carts/{cartId}/delivery/requoted"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+AcceptRequotedOffers. Checkout reports REQUOTE_REQUIRED with the requotedOffers it obtained for the groups it had selected; the BFF writes them here. The supplied set REPLACES the cart's delivery quote (one offer per group) and each offer is the selection of its group, WITHOUT calling delivery-promise. A group keeps the lineNos of the previous quote's group of the same number (a single-group quote spans every line). Lines and destination are untouched. Checkout re-verifies every offer with its pre-authorize check, so nothing is trusted here. Publishes nothing.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./accept-requoted-offers.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./accept-requoted-offers.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./accept-requoted-offers.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
