@@ -520,9 +520,13 @@ components:
         deliverByEarliest:
           type: string
           format: date
+          description: First day of the offer's delivery window, a day of the destination's local calendar (the
+            delivery station's time zone delivery-promise names on the window; UTC when it names none).
         deliverByLatest:
           type: string
           format: date
+          description: Last day of the offer's delivery window, a day of the destination's local calendar (the
+            delivery station's time zone delivery-promise names on the window; UTC when it names none).
         expiresAt:
           type: string
           format: date-time

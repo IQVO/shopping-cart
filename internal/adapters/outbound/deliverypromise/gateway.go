@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -32,21 +33,41 @@ type Gateway struct {
 	base   string
 	client *http.Client
 	now    func() time.Time
+	logger *slog.Logger
+	zones  *zones
 }
 
 var _ ports.QuoteOffers = (*Gateway)(nil)
 
+// Option configures a Gateway.
+type Option func(*Gateway)
+
+// WithLogger sets the logger of the gateway's warnings (an unusable window
+// time zone); the default is slog.Default().
+func WithLogger(logger *slog.Logger) Option {
+	return func(g *Gateway) {
+		if logger != nil {
+			g.logger = logger
+		}
+	}
+}
+
 // New builds a Gateway for the delivery-promise base URL (no trailing slash
 // needed). A nil client gets one with DefaultTimeout; a nil now reads the wall
 // clock (it stamps a quote whose offers carry no quotedAt).
-func New(baseURL string, client *http.Client, now func() time.Time) *Gateway {
+func New(baseURL string, client *http.Client, now func() time.Time, opts ...Option) *Gateway {
 	if client == nil {
 		client = &http.Client{Timeout: DefaultTimeout}
 	}
 	if now == nil {
 		now = time.Now
 	}
-	return &Gateway{base: strings.TrimRight(baseURL, "/"), client: client, now: now}
+	g := &Gateway{base: strings.TrimRight(baseURL, "/"), client: client, now: now, logger: slog.Default()}
+	for _, opt := range opts {
+		opt(g)
+	}
+	g.zones = newZones(g.logger)
+	return g
 }
 
 type lineDTO struct {
@@ -59,9 +80,13 @@ type quoteRequest struct {
 	Lines                   []lineDTO `json:"lines"`
 }
 
+// windowDTO is the offer's DeliveryWindow: two instants and, optionally, the
+// IANA zone of the delivery station that serves the destination (absent on
+// offers quoted before delivery-promise named it).
 type windowDTO struct {
 	Earliest time.Time `json:"earliest"`
 	Latest   time.Time `json:"latest"`
+	TimeZone string    `json:"timeZone,omitempty"`
 }
 
 type offerDTO struct {

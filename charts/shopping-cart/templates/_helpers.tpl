@@ -74,6 +74,13 @@ Name of the Secret holding DATABASE_URL: the operator's own
 {{- end }}
 
 {{/*
+Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 0006).
+*/}}
+{{- define "shopping-cart.a2aFullname" -}}
+{{- include "shopping-cart.fullname" . }}-a2a
+{{- end }}
+
+{{/*
 Image reference. The release job publishes the image as v<version> (and packages
 the chart with appVersion <version>), so an empty image.tag means "v" + appVersion.
 */}}
@@ -181,6 +188,16 @@ The port of HTTP_ADDR is the container port the probes and the Service target.
 {{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.config.httpAddr)) -}}
 {{- if ne $port (toString .Values.service.targetPort) -}}
 {{- fail (printf "config.httpAddr is %q but service.targetPort is %v: the container port, the probes and the Service must agree." .Values.config.httpAddr .Values.service.targetPort) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The port of a2a.httpAddr is the container port the a2a probes and Service target.
+*/}}
+{{- define "shopping-cart.requireA2aPort" -}}
+{{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.a2a.httpAddr)) -}}
+{{- if ne $port (toString .Values.a2a.service.targetPort) -}}
+{{- fail (printf "a2a.httpAddr is %q but a2a.service.targetPort is %v: the container port, the probes and the Service must agree." .Values.a2a.httpAddr .Values.a2a.service.targetPort) -}}
 {{- end -}}
 {{- end -}}
 

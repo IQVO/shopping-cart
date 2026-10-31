@@ -2,7 +2,7 @@
   "offers": [
     {"offerId": "of-1", "state": "QUOTED", "destinationPostalPrefix": "787", "tier": "NEXT_DAY", "groupNo": 1, "basis": "SCHEDULED", "policyVersion": "v3",
      "lines": [{"catalogItemId": "sku-1", "quantity": 2}],
-     "window": {"earliest": "2026-10-26T12:00:00Z", "latest": "2026-10-26T20:00:00Z"},
+     "window": {"earliest": "2026-10-26T12:00:00Z", "latest": "2026-10-26T20:00:00Z", "timeZone": "America/Chicago"},
      "witnessPath": {"nodeId": "fc-aus-1", "pickupDepartureId": "d1", "legs": [], "deliveryWaveId": "w1"},
      "quotedAt": "2026-10-25T13:00:00Z", "expiresAt": "2026-10-25T13:30:00Z"},
     {"offerId": "of-2", "state": "QUOTED", "destinationPostalPrefix": "787", "tier": "STANDARD", "groupNo": 1, "basis": "SCHEDULED", "policyVersion": "v3",

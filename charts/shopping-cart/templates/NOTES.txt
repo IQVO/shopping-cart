@@ -22,6 +22,14 @@ retailnetwork.shopping-cart.analytics ({{ .Values.kafka.brokers }}).
 Postgres and Kafka are the only runtime; delivery offers are quoted through
 delivery-promise at {{ .Values.deliveryPromise.url }}.
 
+{{- if .Values.a2a.enabled }}
+
+A2A agent (read-only, ADR 0006): {{ include "shopping-cart.a2aFullname" . }} (port {{ .Values.a2a.service.port }}), Agent Card at /.well-known/agent-card.json, skills get_cart and list_shopper_carts.
+{{- if .Values.a2a.route.enabled }}
+Gateway route: {{ .Values.a2a.route.path }} (rewritten to /).
+{{- end }}
+{{- end }}
+
 The three consumers are ON under stable group ids:
   offer-availability  group {{ .Values.config.offerAvailabilityConsumerGroup }}, topic retailnetwork.offer-availability.events
   pricing             group {{ .Values.config.pricingConsumerGroup }}, topic retailnetwork.pricing.events
