@@ -6,7 +6,7 @@ info:
     derived from retail-network-docs model/model.yaml (contexts[delivery-promise].rest) and the FINAL cross-context
     decisions (contracts-delta E7, E8, E9; gap register G8, G9, G19, G21, G22). The quote route is an Open Host
     Service for the storefront and an in-organization Customer/Supplier contract for customer-ordering; POST /promises
-    POST /promises/{promiseId}:confirm and POST /promises/{promiseId}:cancel (checkout compensation) are called only
+    POST /promises/{promiseId}/confirmations and POST /promises/{promiseId}/cancellations (checkout compensation) are called only
     by customer-ordering inside checkout. The promise hot
     path makes no synchronous call to any other context: every input is an event-fed local read model. No authentication,
     consistent with the fleet. No personal data appears in any schema: the destination is a postal prefix, never
@@ -32,7 +32,7 @@ tags:
   description: 'Versioned promise policy: offer TTL, hold TTL, packages per order, capacity share and per-tier order
     deadlines (aggregate PromisePolicy, G19).'
 paths:
-  /delivery-offers:quote:
+  /delivery-quotes:
     post:
       tags:
       - DeliveryOffers
@@ -196,7 +196,7 @@ paths:
                 $ref: '#/components/schemas/PromiseBookList'
         '422':
           $ref: '#/components/responses/Unprocessable'
-  /promises/{promiseId}:confirm:
+  /promises/{promiseId}/confirmations:
     post:
       tags:
       - Promises
@@ -229,7 +229,7 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/Unprocessable'
-  /promises/{promiseId}:cancel:
+  /promises/{promiseId}/cancellations:
     post:
       tags:
       - Promises

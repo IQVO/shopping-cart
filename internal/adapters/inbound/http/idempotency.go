@@ -18,7 +18,7 @@ import (
 const IdempotencyKeyHeader = "Idempotency-Key"
 
 // ReplayedHeader marks a response that was served from the stored record.
-const ReplayedHeader = "Idempotent-Replayed"
+const ReplayedHeader = "Idempotency-Replayed"
 
 // maxKeyLength bounds an Idempotency-Key.
 const maxKeyLength = 128

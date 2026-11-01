@@ -18,17 +18,15 @@ import (
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 )
 
-// Route names under which the Idempotency-Key records are stored.
+// Route names under which the Idempotency-Key records are stored: the five
+// POST routes. PUT and DELETE are idempotent by method and take no middleware
+// (a key sent to them is accepted and ignored).
 const (
-	routeCreate      = "POST /carts"
-	routeAddLine     = "POST /carts/{cartId}/lines"
-	routeSetQuantity = "POST /carts/{cartId}/lines/{catalogItemId}:set-quantity"
-	routeRemoveLine  = "POST /carts/{cartId}/lines/{catalogItemId}:remove"
-	routeDestination = "POST /carts/{cartId}:set-destination"
-	routeQuote       = "POST /carts/{cartId}:quote-delivery"
-	routeSelect      = "POST /carts/{cartId}:select-delivery"
-	routeMerge       = "POST /carts/{cartId}:merge-into"
-	routeRequoted    = "POST /carts/{cartId}/delivery/requoted"
+	routeCreate            = "POST /carts"
+	routeAddLine           = "POST /carts/{cartId}/lines"
+	routeQuote             = "POST /carts/{cartId}/delivery-quotes"
+	routeMerge             = "POST /carts/{cartId}/merges"
+	routeRequoteAcceptance = "POST /carts/{cartId}/delivery-requote-acceptances"
 )
 
 // Server holds the use cases the handlers call.
@@ -88,13 +86,13 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.Get("/carts", s.handleList)
 	r.Get("/carts/{cartId}", s.handleGet)
 	r.With(s.idempotent(routeAddLine)).Post("/carts/{cartId}/lines", s.handleAddLine)
-	r.With(s.idempotent(routeSetQuantity)).Post("/carts/{cartId}/lines/{catalogItemId}:set-quantity", s.handleSetQuantity)
-	r.With(s.idempotent(routeRemoveLine)).Post("/carts/{cartId}/lines/{catalogItemId}:remove", s.handleRemoveLine)
-	r.With(s.idempotent(routeDestination)).Post("/carts/{cartId}:set-destination", s.handleSetDestination)
-	r.With(s.idempotent(routeQuote)).Post("/carts/{cartId}:quote-delivery", s.handleQuoteDelivery)
-	r.With(s.idempotent(routeSelect)).Post("/carts/{cartId}:select-delivery", s.handleSelectDelivery)
-	r.With(s.idempotent(routeMerge)).Post("/carts/{cartId}:merge-into", s.handleMerge)
-	r.With(s.idempotent(routeRequoted)).Post("/carts/{cartId}/delivery/requoted", s.handleRequoted)
+	r.Put("/carts/{cartId}/lines/{catalogItemId}", s.handleSetQuantity)
+	r.Delete("/carts/{cartId}/lines/{catalogItemId}", s.handleRemoveLine)
+	r.Put("/carts/{cartId}/destination", s.handleSetDestination)
+	r.With(s.idempotent(routeQuote)).Post("/carts/{cartId}/delivery-quotes", s.handleQuoteDelivery)
+	r.Put("/carts/{cartId}/delivery-selection", s.handleSelectDelivery)
+	r.With(s.idempotent(routeMerge)).Post("/carts/{cartId}/merges", s.handleMerge)
+	r.With(s.idempotent(routeRequoteAcceptance)).Post("/carts/{cartId}/delivery-requote-acceptances", s.handleRequoted)
 	return r
 }
 

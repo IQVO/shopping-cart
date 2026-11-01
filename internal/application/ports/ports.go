@@ -80,7 +80,7 @@ type TaxTableRepository interface {
 }
 
 // QuoteOffers is the cart's only synchronous dependency: delivery-promise
-// QuoteDeliveryOffers (REST POST /delivery-offers:quote).
+// QuoteDeliveryOffers (REST POST /delivery-quotes).
 type QuoteOffers interface {
 	// Quote asks for the offers of the lines to the destination prefix and
 	// returns them as a cart quote stamped quotedAt. The idempotency key is

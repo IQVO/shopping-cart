@@ -40,8 +40,8 @@ func respond(w http.ResponseWriter, r *http.Request, status int, v views.Cart, e
 	writeJSON(w, status, cartOut(v))
 }
 
-// command serves a POST that decodes body B and runs it on the cart of the
-// path; the success status is 200.
+// command serves a POST or PUT that decodes body B and runs it on the cart of
+// the path; the success status is 200.
 func command[B any](w http.ResponseWriter, r *http.Request, run func(r *http.Request, cartID string, body B) (views.Cart, error)) {
 	id, ok := pathID(w, r, "cartId")
 	if !ok {

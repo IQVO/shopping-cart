@@ -152,7 +152,7 @@ func registerCartAssertions(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^the answer is a replay$`, func() error {
-		if w.header.Get("Idempotent-Replayed") != "true" {
+		if w.header.Get("Idempotency-Replayed") != "true" {
 			return fmt.Errorf("the answer is not a replay: %v", w.header)
 		}
 		return nil

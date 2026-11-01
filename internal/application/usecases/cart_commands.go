@@ -98,7 +98,7 @@ func (u SelectDelivery) Execute(ctx context.Context, cartID string, groupNo int,
 }
 
 // AcceptRequotedOffers is the command AcceptRequotedOffers
-// (POST /carts/{cartId}/delivery/requoted). It never calls delivery-promise.
+// (POST /carts/{cartId}/delivery-requote-acceptances). It never calls delivery-promise.
 type AcceptRequotedOffers struct{ Deps }
 
 // Execute writes the offers of a checkout requote as the cart's quote and
@@ -107,7 +107,7 @@ func (u AcceptRequotedOffers) Execute(ctx context.Context, cartID string, offers
 	return u.mutate(ctx, cartID, func(_ context.Context, c *cart.Cart) error { return c.AcceptRequotedOffers(offers, u.now()) })
 }
 
-// MergeInto is the command MergeInto (POST /carts/{cartId}:merge-into).
+// MergeInto is the command MergeInto (POST /carts/{cartId}/merges).
 type MergeInto struct{ Deps }
 
 // Execute takes the source cart's lines into the target and closes the source;

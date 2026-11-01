@@ -9,7 +9,7 @@ import (
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 )
 
-// QuoteDelivery is the command QuoteDelivery (POST /carts/{cartId}:quote-delivery):
+// QuoteDelivery is the command QuoteDelivery (POST /carts/{cartId}/delivery-quotes):
 // the cart's only synchronous call, to delivery-promise QuoteDeliveryOffers.
 type QuoteDelivery struct{ Deps }
 
