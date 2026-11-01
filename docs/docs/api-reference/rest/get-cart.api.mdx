@@ -1,0 +1,70 @@
+---
+id: get-cart
+title: "Get a cart with its quote, selections and estimate"
+description: "GetCart. Includes the CheckoutReadiness view (every group selected, no offer expired) and the labelled, non-binding estimate. Called by the BFF and, at checkout session open, by checkout."
+sidebar_label: "Get a cart with its quote, selections and estimate"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: docs/api-reference/rest/shopping-cart-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get a cart with its quote, selections and estimate"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/carts/{cartId}"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+GetCart. Includes the CheckoutReadiness view (every group selected, no offer expired) and the labelled, non-binding estimate. Called by the BFF and, at checkout session open, by checkout.
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-cart.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-cart.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-cart.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

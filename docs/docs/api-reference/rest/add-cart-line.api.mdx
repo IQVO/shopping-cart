@@ -1,0 +1,70 @@
+---
+id: add-cart-line
+title: "Add a line to the cart (merges into an existing line of the item)"
+description: "AddLine. One line per item: adding an item already in the cart merges quantities; nothing is ever rejected as a duplicate. Clears the current delivery quote and selections. Publishes CartLineAdded (analytics)."
+sidebar_label: "Add a line to the cart (merges into an existing line of the item)"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/shopping-cart-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Add a line to the cart (merges into an existing line of the item)"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/carts/{cartId}/lines"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+AddLine. One line per item: adding an item already in the cart merges quantities; nothing is ever rejected as a duplicate. Clears the current delivery quote and selections. Publishes CartLineAdded (analytics).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./add-cart-line.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./add-cart-line.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./add-cart-line.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
