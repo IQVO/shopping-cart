@@ -161,7 +161,7 @@ func registerCartAssertions(sc *godog.ScenarioContext, w *world) {
 		if err := w.get("/carts?shopperId=" + shopper); err != nil {
 			return err
 		}
-		v, _ := w.lookup("carts")
+		v, _ := w.lookup("items")
 		if arr, _ := v.([]any); len(arr) != n {
 			return fmt.Errorf("shopper has %d carts, want %d", len(arr), n)
 		}

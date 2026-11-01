@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 )
@@ -37,12 +38,13 @@ func (r *CartRepository) Save(ctx context.Context, c *cart.Cart) error {
 	return nil
 }
 
-// ListByShopper implements ports.CartRepository.
-func (r *CartRepository) ListByShopper(ctx context.Context, shopperID string, state cart.State) ([]*cart.Cart, error) {
+// ListByShopper implements ports.CartRepository: (created-at, id) descending,
+// strictly after the keyset, at most limit rows.
+func (r *CartRepository) ListByShopper(ctx context.Context, shopperID string, state cart.State, after *pagination.Keyset, limit int) ([]*cart.Cart, error) {
 	defer r.s.enter(ctx)()
 	var snaps []cart.Snapshot
 	for _, s := range r.s.carts {
-		if shopperID != "" && s.ShopperID == shopperID && (state == "" || s.State == state) {
+		if listed(s, shopperID, state, after) {
 			snaps = append(snaps, s)
 		}
 	}
@@ -52,7 +54,31 @@ func (r *CartRepository) ListByShopper(ctx context.Context, shopperID string, st
 		}
 		return -compareIDs(a.ID, b.ID)
 	})
+	if limit >= 0 && len(snaps) > limit {
+		snaps = snaps[:limit]
+	}
 	return restoreAll(snaps)
+}
+
+// listed reports whether the snapshot belongs to the shopper's (optionally
+// state-filtered) list and sorts after the keyset.
+func listed(s cart.Snapshot, shopperID string, state cart.State, after *pagination.Keyset) bool {
+	if shopperID == "" || s.ShopperID != shopperID || (state != "" && s.State != state) {
+		return false
+	}
+	return isAfter(s, after)
+}
+
+// isAfter reports whether the snapshot sorts strictly after the keyset in the
+// (created-at, id) descending order; a nil keyset admits every snapshot.
+func isAfter(s cart.Snapshot, k *pagination.Keyset) bool {
+	if k == nil {
+		return true
+	}
+	if c := s.CreatedAt.Compare(k.CreatedAt); c != 0 {
+		return c < 0
+	}
+	return compareIDs(s.ID, cart.ID(k.ID)) < 0
 }
 
 func compareIDs(a, b cart.ID) int {

@@ -1,9 +1,12 @@
 package repocontract
 
 import (
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 )
 
@@ -37,20 +40,72 @@ func listByShopper(t *testing.T, e Env) {
 	for _, c := range []*cart.Cart{older, newer, tie, other} {
 		must(t, e.Carts.Save(bg(), c))
 	}
-	got, err := e.Carts.ListByShopper(bg(), "shopper-q", "")
+	got, err := e.Carts.ListByShopper(bg(), "shopper-q", "", nil, 10)
 	must(t, err)
 	if !equalIDs(got, "cart-q3", "cart-q2", "cart-q1") {
 		t.Fatalf("order = %v", ids(got))
 	}
-	got, err = e.Carts.ListByShopper(bg(), "shopper-q", cart.StateOpen)
+	got, err = e.Carts.ListByShopper(bg(), "shopper-q", cart.StateOpen, nil, 10)
 	must(t, err)
 	if !equalIDs(got, "cart-q2", "cart-q1") {
 		t.Fatalf("open = %v", ids(got))
 	}
-	got, err = e.Carts.ListByShopper(bg(), "nobody", "")
+	got, err = e.Carts.ListByShopper(bg(), "nobody", "", nil, 10)
 	must(t, err)
 	if len(got) != 0 {
 		t.Fatalf("unknown shopper = %v", ids(got))
+	}
+}
+
+// listByShopperPages walks the whole list with every page size, over carts
+// that share created-at instants, and expects exactly the unpaged order: no
+// row repeated, none skipped, and the keyset strictly after the last row.
+func listByShopperPages(t *testing.T, e Env) {
+	type row struct {
+		id      string
+		minutes int
+	}
+	var rows []row
+	for i := 0; i < 9; i++ {
+		// Three carts per instant, ids not in time order: the ties a created-at-only keyset drops.
+		r := row{id: "cart-p" + string(rune('a'+i)), minutes: i % 3}
+		must(t, e.Carts.Save(bg(), newCart(t, r.id, "shopper-p", at(r.minutes))))
+		rows = append(rows, r)
+	}
+	must(t, e.Carts.Save(bg(), newCart(t, "cart-other", "shopper-other", at(1))))
+	// (created-at, id) descending: newest instant first, ids descending inside it.
+	slices.SortFunc(rows, func(a, b row) int {
+		if a.minutes != b.minutes {
+			return b.minutes - a.minutes
+		}
+		return -strings.Compare(a.id, b.id)
+	})
+	want := make([]string, len(rows))
+	for i, r := range rows {
+		want[i] = r.id
+	}
+	for _, size := range []int{1, 2, 3, 4, 9, 10} {
+		var seen []string
+		var after *pagination.Keyset
+		for pages := 0; ; pages++ {
+			if pages > len(want)+1 {
+				t.Fatalf("size %d: the walk never ends", size)
+			}
+			got, err := e.Carts.ListByShopper(bg(), "shopper-p", "", after, size)
+			must(t, err)
+			if len(got) > size {
+				t.Fatalf("size %d: page of %d rows", size, len(got))
+			}
+			seen = append(seen, ids(got)...)
+			if len(got) < size {
+				break
+			}
+			last := got[len(got)-1]
+			after = &pagination.Keyset{CreatedAt: last.CreatedAt(), ID: string(last.ID())}
+		}
+		if !slices.Equal(seen, want) {
+			t.Fatalf("size %d: walked %v, want %v", size, seen, want)
+		}
 	}
 }
 

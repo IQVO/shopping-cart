@@ -101,10 +101,6 @@ type cartBody struct {
 	Version                 int64           `json:"version"`
 }
 
-type cartListBody struct {
-	Carts []cartBody `json:"carts"`
-}
-
 func strPtr(s string) *string {
 	if s == "" {
 		return nil

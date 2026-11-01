@@ -149,14 +149,15 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, shared.Invalid("state must be OPEN, CHECKED_OUT, ABANDONED or MERGED"))
 		return
 	}
-	carts, err := s.ListCarts.Execute(r.Context(), shopper, state)
+	limit, after, err := pageParams(r)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	out := cartListBody{Carts: make([]cartBody, len(carts))}
-	for i, v := range carts {
-		out.Carts[i] = cartOut(v)
+	res, err := s.ListCarts.Execute(r.Context(), shopper, state, after, limit)
+	if err != nil {
+		writeError(w, r, err)
+		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, cartPageOut(res.Items, res.Next))
 }

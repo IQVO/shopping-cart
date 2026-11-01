@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/IQVO/shopping-cart/internal/adapters/inbound/http/page"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 	"github.com/IQVO/shopping-cart/internal/domain/shared"
@@ -31,6 +32,8 @@ var (
 	idempotencyKeyRequired = problem{http.StatusBadRequest, "idempotency-key-required", "Idempotency-Key header is required"}
 	idempotencyKeyInvalid  = problem{http.StatusBadRequest, "idempotency-key-invalid", "Idempotency-Key header is invalid"}
 	idempotencyKeyReused   = problem{http.StatusConflict, "idempotency-key-reused", "Idempotency-Key was already used with a different request"}
+	invalidLimit           = problem{http.StatusBadRequest, "invalid-limit", "limit must be an integer between 1 and 500"}
+	invalidCursor          = problem{http.StatusBadRequest, "invalid-cursor", "cursor is not a valid page token"}
 )
 
 func unprocessable(slug, title string) problem {
@@ -53,6 +56,8 @@ var problemCatalogue = []struct {
 	p   problem
 }{
 	{errMalformedRequest, problem{http.StatusBadRequest, "malformed-request", "Malformed request"}},
+	{page.ErrInvalidLimit, invalidLimit},
+	{page.ErrInvalidCursor, invalidCursor},
 	{ports.ErrNotFound, notFound},
 	{cart.ErrLineNotFound, notFound},
 	{cart.ErrCartClosed, conflict("cart-closed", "A checked-out, abandoned or merged cart never changes")},

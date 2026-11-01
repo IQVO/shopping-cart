@@ -91,7 +91,7 @@ func Card(cfg Config) *a2a.AgentCard {
 			{
 				ID:          skillListShopperCarts,
 				Name:        "List a shopper's carts",
-				Description: "Read the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. The same answer as GET /carts?shopperId=&state=. A shopper with no carts gets an empty list, not a problem. Persists nothing.",
+				Description: "Read the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. The same answer as GET /carts?shopperId=&state= with every page followed (up to 1000 carts, the newest). A shopper with no carts gets an empty list, not a problem. Persists nothing.",
 				Tags:        []string{"cart", "shopper", "read"},
 				InputModes:  []string{"application/json"},
 				Examples: []string{

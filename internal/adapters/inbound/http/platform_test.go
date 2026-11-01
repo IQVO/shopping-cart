@@ -19,7 +19,7 @@ func TestIdempotencyKeyRequiredAndReplay(t *testing.T) {
 		t.Fatalf("replay differs: %q vs %q (%v)", again.Body, first.Body, again.Header)
 	}
 	e.wantProblem(e.do(http.MethodPost, "/carts", "k1", `{"shopperId":"s2"}`), http.StatusConflict, "idempotency-key-reused")
-	if n := len(e.get("/carts?shopperId=s1").json(t)["carts"].([]any)); n != 1 {
+	if n := len(e.get("/carts?shopperId=s1").json(t)["items"].([]any)); n != 1 {
 		t.Fatalf("replay created again: %d carts", n)
 	}
 }

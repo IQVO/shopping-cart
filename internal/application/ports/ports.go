@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/IQVO/shopping-cart/internal/application/idempotency"
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/application/readmodel"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 	"github.com/IQVO/shopping-cart/internal/domain/estimate"
@@ -29,9 +30,11 @@ type CartRepository interface {
 	// Save persists the cart snapshot under the concurrency rule of the
 	// package comment.
 	Save(ctx context.Context, c *cart.Cart) error
-	// ListByShopper returns the shopper's carts, newest first, optionally only
-	// those in state (empty state means every state).
-	ListByShopper(ctx context.Context, shopperID string, state cart.State) ([]*cart.Cart, error)
+	// ListByShopper returns up to limit of the shopper's carts ordered by
+	// (created-at, id) descending, optionally only those in state (empty state
+	// means every state). A non-nil after resumes strictly after that keyset,
+	// so carts sharing a created-at are never skipped or repeated.
+	ListByShopper(ctx context.Context, shopperID string, state cart.State, after *pagination.Keyset, limit int) ([]*cart.Cart, error)
 	// ListIdleOpen returns up to limit OPEN carts last changed at or before the
 	// instant, oldest first (policy AbandonInactive).
 	ListIdleOpen(ctx context.Context, cutoff time.Time, limit int) ([]*cart.Cart, error)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 	"github.com/IQVO/shopping-cart/internal/domain/estimate"
@@ -43,12 +44,57 @@ func TestListCartsFiltersByShopperAndState(t *testing.T) {
 	e.clock.Advance(1e9)
 	b := e.newCart(t, "shopper-1")
 	_ = e.newCart(t, "shopper-2")
-	got, err := usecases.ListCarts{Deps: e.deps}.Execute(ctx, "shopper-1", "")
-	if err != nil || len(got) != 2 || got[0].CartID != b.CartID || got[1].CartID != a.CartID {
+	got, err := usecases.ListCarts{Deps: e.deps}.Execute(ctx, "shopper-1", "", nil, 10)
+	if err != nil || len(got.Items) != 2 || got.Items[0].CartID != b.CartID || got.Items[1].CartID != a.CartID || got.Next != nil {
 		t.Fatalf("%+v %v", got, err)
 	}
-	got, _ = usecases.ListCarts{Deps: e.deps}.Execute(ctx, "shopper-1", cart.StateMerged)
-	if len(got) != 0 {
+	got, _ = usecases.ListCarts{Deps: e.deps}.Execute(ctx, "shopper-1", cart.StateMerged, nil, 10)
+	if len(got.Items) != 0 {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestListCartsWalksEveryPageOnce(t *testing.T) {
+	e := newEnv(t)
+	want := map[string]bool{}
+	for i := 0; i < 7; i++ {
+		// Carts 0-2 and 3-5 share an instant (the clock only advances between groups).
+		if i%3 == 0 {
+			e.clock.Advance(1e9)
+		}
+		want[e.newCart(t, "shopper-1").CartID] = true
+	}
+	for _, limit := range []int{1, 2, 3, 7, 8} {
+		seen := map[string]bool{}
+		for _, id := range walkCartPages(t, e, limit) {
+			if seen[id] || !want[id] {
+				t.Fatalf("limit %d: %s listed twice or unknown", limit, id)
+			}
+			seen[id] = true
+		}
+		if len(seen) != len(want) {
+			t.Fatalf("limit %d: walked %d of %d carts", limit, len(seen), len(want))
+		}
+	}
+}
+
+// walkCartPages follows Next until the last page and returns every cartId in
+// the order served; no page may exceed limit.
+func walkCartPages(t *testing.T, e *env, limit int) []string {
+	t.Helper()
+	var ids []string
+	var after *pagination.Keyset
+	for {
+		pg, err := usecases.ListCarts{Deps: e.deps}.Execute(context.Background(), "shopper-1", "", after, limit)
+		if err != nil || len(pg.Items) > limit {
+			t.Fatalf("limit %d: %d items, %v", limit, len(pg.Items), err)
+		}
+		for _, v := range pg.Items {
+			ids = append(ids, v.CartID)
+		}
+		if pg.Next == nil {
+			return ids
+		}
+		after = pg.Next
 	}
 }

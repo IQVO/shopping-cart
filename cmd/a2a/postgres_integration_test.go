@@ -154,8 +154,8 @@ func restJSON(t *testing.T, h http.Handler, target string) any {
 	if err := json.Unmarshal(rec.Body.Bytes(), &v); err != nil {
 		t.Fatal(err)
 	}
-	if m, ok := v.(map[string]any); ok && m["carts"] != nil {
-		return m["carts"]
+	if m, ok := v.(map[string]any); ok && m["items"] != nil {
+		return m["items"]
 	}
 	return v
 }

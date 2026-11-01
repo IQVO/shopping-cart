@@ -88,7 +88,7 @@ func TestGetAndListCarts(t *testing.T) {
 	id := e.newCart("shopper-1")
 	e.wantStatus(e.get("/carts/"+id), http.StatusOK)
 	e.wantProblem(e.get("/carts/nope"), http.StatusNotFound, "not-found")
-	got := e.get("/carts?shopperId=shopper-1&state=OPEN").json(t)["carts"].([]any)
+	got := e.get("/carts?shopperId=shopper-1&state=OPEN").json(t)["items"].([]any)
 	if len(got) != 1 {
 		t.Fatalf("%v", got)
 	}
