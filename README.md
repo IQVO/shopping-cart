@@ -14,18 +14,22 @@ This project is a domain-driven design study. It is not associated with, endorse
 
 ## Documentation
 
-This repo has no docs site of its own. The context's design lives in
-[warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/) — `storefront/model/model.yaml` there is the single source of truth.
-
-Page map:
+Full documentation: **<https://iqvo.github.io/shopping-cart/>** (Docusaurus, built from `docs/` and
+published from `main`). The site is written from the code; the design pack it
+mirrors lives in [warehouse-docs](https://iqvo.github.io/warehouse-docs/storefront/contexts/shopping-cart).
 
 | Area | Pages |
 |---|---|
-| Context pack | [Shopping Cart context page](https://iqvo.github.io/warehouse-docs/storefront/contexts/shopping-cart) and its 13-page ddd-crew pack (business context, ubiquitous language, core-domain chart, bounded-context canvas, context map, aggregate canvas, domain events, message flow, eventstorming, use cases, class/sequence/ER diagrams) |
-| Strategic design | [Storefront strategic design](https://iqvo.github.io/warehouse-docs/storefront/strategic-design/) — subdomain classification, context map, CloudEvents event standard, model gap register |
-| API reference | [REST reference generated from `apis/openapi.yaml`](https://iqvo.github.io/warehouse-docs/storefront/api-reference/rest/shopping-cart/) |
-| Decisions | [Storefront ADR index](https://iqvo.github.io/warehouse-docs/storefront/adr/) |
-| In this repo | [`docs/adr/`](docs/adr/) (the repo's own ADRs), [`docs/operations/runbook.md`](docs/operations/runbook.md), [`docs/before-first-release.md`](docs/before-first-release.md) |
+| Overview | [Introduction](https://iqvo.github.io/shopping-cart/docs/overview/introduction), [Architecture](https://iqvo.github.io/shopping-cart/docs/overview/architecture), [Quickstart](https://iqvo.github.io/shopping-cart/docs/overview/quickstart) |
+| Operations | [Configuration](https://iqvo.github.io/shopping-cart/docs/operations/configuration), [Runbook](https://iqvo.github.io/shopping-cart/docs/operations/runbook) (source: [`docs/docs/operations/runbook.md`](docs/docs/operations/runbook.md)), [Observability](https://iqvo.github.io/shopping-cart/docs/operations/observability), [Troubleshooting](https://iqvo.github.io/shopping-cart/docs/operations/troubleshooting), [Before the first release](https://iqvo.github.io/shopping-cart/docs/operations/before-first-release) (source: [`docs/docs/operations/before-first-release.md`](docs/docs/operations/before-first-release.md)) |
+| Development | [Testing](https://iqvo.github.io/shopping-cart/docs/development/testing) |
+| Domain-driven design | [Ubiquitous language](https://iqvo.github.io/shopping-cart/docs/ddd/ubiquitous-language), [Use cases](https://iqvo.github.io/shopping-cart/docs/ddd/use-cases), [Subdomain classification](https://iqvo.github.io/shopping-cart/docs/ddd/subdomain-classification) |
+| DDD artifacts (ddd-crew) | [Index](https://iqvo.github.io/shopping-cart/docs/ddd/ddd-artifacts), [Core domain chart](https://iqvo.github.io/shopping-cart/docs/ddd/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/shopping-cart/docs/ddd/bounded-context-canvas), [Context map](https://iqvo.github.io/shopping-cart/docs/ddd/context-map), [Aggregate design canvas](https://iqvo.github.io/shopping-cart/docs/ddd/aggregate-design-canvas), [Domain message flow](https://iqvo.github.io/shopping-cart/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/shopping-cart/docs/ddd/eventstorming), [Class diagrams](https://iqvo.github.io/shopping-cart/docs/ddd/class-diagram), [Entity-relationship](https://iqvo.github.io/shopping-cart/docs/ddd/entity-relationship), [Sequence diagrams](https://iqvo.github.io/shopping-cart/docs/ddd/sequence-diagrams), [Domain events](https://iqvo.github.io/shopping-cart/docs/ddd/domain-events) |
+| API reference | [Overview (REST and A2A)](https://iqvo.github.io/shopping-cart/docs/api-reference), the generated REST reference from [`apis/openapi.yaml`](apis/openapi.yaml), [Event catalogue](https://iqvo.github.io/shopping-cart/docs/api-reference/events) from [`apis/asyncapi.yaml`](apis/asyncapi.yaml) |
+| Ecosystem | [Integration](https://iqvo.github.io/shopping-cart/docs/ecosystem/integration) |
+| Decisions | [ADR index](https://iqvo.github.io/shopping-cart/docs/adr) (sources in [`docs/adr/`](docs/adr/)); the [storefront ADR index](https://iqvo.github.io/warehouse-docs/storefront/adr/) |
+
+Preview locally with `cd docs && npm ci && npm start`.
 
 ## Architecture
 
@@ -292,9 +296,10 @@ publish) run only on pushes to `main`, after every other job is green.
 
 ## Architecture Decision Records
 
-[`docs/adr/`](docs/adr/) — 6 ADRs (0001 bounded context, 0002 assumptions,
+[`docs/adr/`](docs/adr/) — 7 ADRs (0001 bounded context, 0002 assumptions,
 0003 consumed contracts and local read model, 0004 CloudEvents envelope and
-type catalogue, 0005 fleet observability standard, 0006 A2A inbound adapter).
+type catalogue, 0005 fleet observability standard, 0006 A2A inbound adapter,
+0007 delivery dates in the destination's local calendar).
 
 ## License
 

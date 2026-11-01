@@ -35,7 +35,13 @@ function HomepageHeader() {
           {siteConfig.title}
         </Heading>
         <p className={styles.heroSubtitle}>{siteConfig.tagline}</p>
-        <p className={styles.heroLead}>TODO-LEAD</p>
+        <p className={styles.heroLead}>
+          Shopping Cart holds a shopper's intent: lines, the destination postal prefix, the
+          delivery quote delivery-promise returned for each shipment group, the shopper's
+          selected offer per group, and a labelled, non-binding estimate. It publishes four
+          analytics events, closes the cart when checkout completes, and owns nothing about
+          prices, stock or the order itself.
+        </p>
         <div className={styles.buttons}>
           <Link className="button button--primary button--lg" to="/docs/overview/introduction">
             Read the docs

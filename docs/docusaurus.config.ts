@@ -6,7 +6,7 @@ import type * as OpenApiPlugin from 'docusaurus-plugin-openapi-docs';
 const config: Config = {
   title: 'Shopping Cart',
   tagline:
-    'Shopping Cart: a Supporting bounded context of the storefront domain (warehouse-systems).',
+    'The cart, its delivery quote and a non-binding estimate: a Supporting bounded context of the storefront domain.',
   favicon: 'img/favicon.svg',
 
   future: {
