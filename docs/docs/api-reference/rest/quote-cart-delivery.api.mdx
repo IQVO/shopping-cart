@@ -1,0 +1,70 @@
+---
+id: quote-cart-delivery
+title: "Quote delivery offers for the cart"
+description: "QuoteDelivery. Calls delivery-promise POST /delivery-offers:quote (network OHS) synchronously and stores the returned quote: groups with their lines and offers (offerId, tier, window, expiresAt) plus the unavailable tiers. The quote holds no capacity. Publishes CartDeliveryQuoted (analytics)."
+sidebar_label: "Quote delivery offers for the cart"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: docs/api-reference/rest/shopping-cart-api
+custom_edit_url: null
+hide_send_button: true
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Quote delivery offers for the cart"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/carts/{cartId}:quote-delivery"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+QuoteDelivery. Calls delivery-promise POST /delivery-offers:quote (network OHS) synchronously and stores the returned quote: groups with their lines and offers (offerId, tier, window, expiresAt) plus the unavailable tiers. The quote holds no capacity. Publishes CartDeliveryQuoted (analytics).
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./quote-cart-delivery.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./quote-cart-delivery.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./quote-cart-delivery.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      
