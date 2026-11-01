@@ -1,8 +1,8 @@
-Feature: Every write takes an Idempotency-Key
+Feature: Every POST takes an Idempotency-Key
   The first answer below 500 is stored for 24 hours: the same key and request
   replays it, the same key with another request is refused.
 
-  Scenario: A write without a key is refused
+  Scenario: A POST without a key is refused
     When I POST "/carts" without a key and body {}
     Then the API answers 400
     And the problem type is "idempotency-key-required"

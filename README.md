@@ -179,22 +179,30 @@ Kafka and each consumer continues the trace. See
 
 Contract: [`apis/openapi.yaml`](apis/openapi.yaml). No authentication. Errors
 are RFC 9457 problem details (`application/problem+json`) whose `type` is
-`/problems/<slug>`. Every state-changing request takes an `Idempotency-Key`
-header; a retry with the same key replays the first response.
+`/problems/<slug>`. Every `POST` takes an `Idempotency-Key` header (1 to 128
+printable ASCII characters, one fresh UUID per logical submit): a retry with the
+same key and the same request replays the first response with
+`Idempotency-Replayed: true`, the same key with another request is
+`409 idempotency-key-reused`, no key is `400 idempotency-key-required`. `PUT` and
+`DELETE` are idempotent by method and need no key. `GET /carts` is keyset-paged:
+`limit` (1 to 500, default 100) and `cursor`, answered as
+`{"items": [...], "nextCursor": "..."}` (`nextCursor` is absent on the last page;
+a bad value is `400 invalid-limit` / `invalid-cursor`). Follow `nextCursor` until
+it is absent. See ADR [0008](docs/adr/0008-adopt-the-fleet-rest-api-guideline.md).
 
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/carts` | Create a cart |
-| `GET` | `/carts?shopperId=&state=` | List carts |
+| `GET` | `/carts?shopperId=&state=&limit=&cursor=` | List carts, one page (`{items, nextCursor}`) |
 | `GET` | `/carts/{cartId}` | Get one cart |
 | `POST` | `/carts/{cartId}/lines` | Add a line |
-| `POST` | `/carts/{cartId}/lines/{catalogItemId}:set-quantity` | Set a line's quantity |
-| `POST` | `/carts/{cartId}/lines/{catalogItemId}:remove` | Remove a line |
-| `POST` | `/carts/{cartId}:set-destination` | Set the destination postal prefix (clears the quote and the selections) |
-| `POST` | `/carts/{cartId}:quote-delivery` | Quote delivery offers for the cart |
-| `POST` | `/carts/{cartId}:select-delivery` | Select the delivery tier per shipment group |
-| `POST` | `/carts/{cartId}:merge-into` | Merge this cart into another |
-| `POST` | `/carts/{cartId}/delivery/requoted` | Accept re-quoted offers |
+| `PUT` | `/carts/{cartId}/lines/{catalogItemId}` | Set a line's quantity |
+| `DELETE` | `/carts/{cartId}/lines/{catalogItemId}` | Remove a line |
+| `PUT` | `/carts/{cartId}/destination` | Set the destination postal prefix (clears the quote and the selections) |
+| `POST` | `/carts/{cartId}/delivery-quotes` | Quote delivery offers for the cart |
+| `PUT` | `/carts/{cartId}/delivery-selection` | Select the delivery tier per shipment group |
+| `POST` | `/carts/{cartId}/merges` | Merge this cart into another |
+| `POST` | `/carts/{cartId}/delivery-requote-acceptances` | Accept re-quoted offers |
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness (Postgres ping + Kafka metadata) |
 
@@ -235,7 +243,7 @@ It never writes and exposes exactly what REST exposes.
 | Skill | Arguments | Same as |
 |---|---|---|
 | `get_cart` | `{"cartId": "..."}` | `GET /carts/{cartId}` |
-| `list_shopper_carts` | `{"shopperId": "...", "state": "OPEN"}` (`state` optional) | `GET /carts?shopperId=&state=` |
+| `list_shopper_carts` | `{"shopperId": "...", "state": "OPEN"}` (`state` optional) | `GET /carts?shopperId=&state=` with every page followed (the newest 1000 carts at most) |
 
 Send a data part `{"skill": "get_cart", "arguments": {"cartId": "..."}}`; the
 reply is one message with a data part `{"skill", "data" | "problem"}` and a
@@ -292,9 +300,11 @@ publish) run only on pushes to `main`, after every other job is green.
 
 ## Architecture Decision Records
 
-[`docs/adr/`](docs/adr/) — 6 ADRs (0001 bounded context, 0002 assumptions,
+[`docs/adr/`](docs/adr/) — 8 ADRs (0001 bounded context, 0002 assumptions,
 0003 consumed contracts and local read model, 0004 CloudEvents envelope and
-type catalogue, 0005 fleet observability standard, 0006 A2A inbound adapter).
+type catalogue, 0005 fleet observability standard, 0006 A2A inbound adapter,
+0007 delivery dates in the destination's local calendar, 0008 fleet REST API
+guideline).
 
 ## License
 

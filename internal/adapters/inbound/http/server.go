@@ -18,11 +18,9 @@ import (
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 )
 
-// Route names under which the Idempotency-Key records are stored: the five
-// POST routes. PUT and DELETE are idempotent by method and take no middleware
-// (a key sent to them is accepted and ignored).
-
-// Server holds the use cases the handlers call.
+// Server holds the use cases the handlers call. The five POST routes sit behind
+// the Idempotency-Key middleware; PUT and DELETE are idempotent by method and
+// take none (a key sent to them is accepted and ignored).
 type Server struct {
 	CreateCart           usecases.CreateCart
 	AddLine              usecases.AddLine
