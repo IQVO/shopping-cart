@@ -90,6 +90,7 @@ func TestTheShippedBinaryIsWiredEndToEnd(t *testing.T) {
 		t.Fatalf("after restart = %d %s", got.status, got.body)
 	}
 	t.Run("an idle cart is abandoned and later purged by the schedulers", func(t *testing.T) { idleCartLifecycle(t, svc, dsn) })
+	t.Run("the Idempotency-Key contract holds over the shipped binary and Postgres", func(t *testing.T) { idempotencyOverPostgres(t, svc) })
 	t.Run("readyz is 503 dependency-unavailable while kafka is down", func(t *testing.T) { assertKafkaDownReadiness(t, svc) })
 }
 
