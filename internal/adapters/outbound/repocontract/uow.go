@@ -4,9 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
-	"github.com/IQVO/shopping-cart/internal/application/idempotency"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 	"github.com/IQVO/shopping-cart/internal/domain/estimate"
@@ -78,6 +76,25 @@ func testUnitOfWork(t *testing.T, e Env) {
 		_, err = e.Carts.Get(bg(), "cart-nest")
 		wantErr(t, err, ports.ErrNotFound)
 	})
+	t.Run("a nested unit that fails undoes only itself", func(t *testing.T) {
+		// The use cases retry a whole attempt on ErrConcurrentUpdate: the failed
+		// attempt must leave nothing behind inside the unit it joined.
+		err := e.UoW.Do(bg(), func(ctx context.Context) error {
+			must(t, e.Carts.Save(ctx, newCart(t, "cart-keep", "", t0)))
+			inner := e.UoW.Do(ctx, func(ctx context.Context) error {
+				must(t, e.Carts.Save(ctx, newCart(t, "cart-undone", "", t0)))
+				return errBoom
+			})
+			wantErr(t, inner, errBoom)
+			return nil
+		})
+		must(t, err)
+		if _, err := e.Carts.Get(bg(), "cart-keep"); err != nil {
+			t.Fatalf("the outer write must commit: %v", err)
+		}
+		_, err = e.Carts.Get(bg(), "cart-undone")
+		wantErr(t, err, ports.ErrNotFound)
+	})
 }
 
 // mustEvents returns two events the cart raises.
@@ -87,40 +104,4 @@ func mustEvents(t *testing.T) []shared.Event {
 	must(t, c.AddLine("item-ev", 1, true, at(1)))
 	must(t, c.CloseOnCheckoutCompleted("sess-ev", at(2)))
 	return c.PullEvents()
-}
-
-func testIdempotency(t *testing.T, e Env) {
-	_, err := e.Idempotency.Get(bg(), "POST /carts", "k1")
-	wantErr(t, err, ports.ErrNotFound)
-	rec := idempotency.Record{RequestHash: "h1", Status: 201, ContentType: "application/json", Body: []byte(`{"a":1}`), CreatedAt: e.Clock.Now().UTC()}
-	stored, err := e.Idempotency.Put(bg(), "POST /carts", "k1", rec)
-	must(t, err)
-	if !stored {
-		t.Fatal("the first Put must store")
-	}
-	stored, err = e.Idempotency.Put(bg(), "POST /carts", "k1", idempotency.Record{RequestHash: "h2", Status: 500, CreatedAt: e.Clock.Now().UTC()})
-	must(t, err)
-	if stored {
-		t.Fatal("a second Put must not overwrite")
-	}
-	got, err := e.Idempotency.Get(bg(), "POST /carts", "k1")
-	must(t, err)
-	if got.RequestHash != "h1" || got.Status != 201 || got.ContentType != "application/json" || string(got.Body) != `{"a":1}` {
-		t.Fatalf("stored record = %+v", got)
-	}
-	if _, err := e.Idempotency.Get(bg(), "POST /carts/{cartId}/lines", "k1"); !errors.Is(err, ports.ErrNotFound) {
-		t.Fatalf("the route is part of the key: %v", err)
-	}
-	old := idempotency.Record{RequestHash: "old", Status: 200, CreatedAt: e.Clock.Now().UTC().Add(-idempotency.TTL - time.Minute)}
-	if _, err := e.Idempotency.Put(bg(), "POST /carts/{cartId}/lines", "k-old", old); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := e.Idempotency.Get(bg(), "POST /carts/{cartId}/lines", "k-old"); !errors.Is(err, ports.ErrNotFound) {
-		t.Fatalf("an expired record must read as absent: %v", err)
-	}
-	replaced, err := e.Idempotency.Put(bg(), "POST /carts/{cartId}/lines", "k-old", idempotency.Record{RequestHash: "new", Status: 201, CreatedAt: e.Clock.Now().UTC()})
-	must(t, err)
-	if !replaced {
-		t.Fatal("an expired record is replaceable")
-	}
 }

@@ -21,13 +21,6 @@ import (
 // Route names under which the Idempotency-Key records are stored: the five
 // POST routes. PUT and DELETE are idempotent by method and take no middleware
 // (a key sent to them is accepted and ignored).
-const (
-	routeCreate            = "POST /carts"
-	routeAddLine           = "POST /carts/{cartId}/lines"
-	routeQuote             = "POST /carts/{cartId}/delivery-quotes"
-	routeMerge             = "POST /carts/{cartId}/merges"
-	routeRequoteAcceptance = "POST /carts/{cartId}/delivery-requote-acceptances"
-)
 
 // Server holds the use cases the handlers call.
 type Server struct {
@@ -82,20 +75,20 @@ func NewRouter(s *Server, logger *slog.Logger, serviceName string) http.Handler 
 	r.Get("/healthz", handleHealthz)
 	r.Get("/readyz", s.handleReadyz)
 
-	r.With(s.idempotent(routeCreate)).Post("/carts", s.handleCreate)
+	r.With(s.idempotent).Post("/carts", s.handleCreate)
 	r.Get("/carts", s.handleList)
 	r.Get("/carts/{cartId}", s.handleGet)
-	r.With(s.idempotent(routeAddLine)).Post("/carts/{cartId}/lines", s.handleAddLine)
+	r.With(s.idempotent).Post("/carts/{cartId}/lines", s.handleAddLine)
 	r.Put("/carts/{cartId}/lines/{catalogItemId}", s.handleSetQuantity)
 	r.Delete("/carts/{cartId}/lines/{catalogItemId}", s.handleRemoveLine)
 	r.Put("/carts/{cartId}/destination", s.handleSetDestination)
-	r.With(s.idempotent(routeQuote)).Post("/carts/{cartId}/delivery-quotes", s.handleQuoteDelivery)
+	r.With(s.idempotent).Post("/carts/{cartId}/delivery-quotes", s.handleQuoteDelivery)
 	r.Put("/carts/{cartId}/delivery-selection", s.handleSelectDelivery)
-	r.With(s.idempotent(routeMerge)).Post("/carts/{cartId}/merges", s.handleMerge)
-	r.With(s.idempotent(routeRequoteAcceptance)).Post("/carts/{cartId}/delivery-requote-acceptances", s.handleRequoted)
+	r.With(s.idempotent).Post("/carts/{cartId}/merges", s.handleMerge)
+	r.With(s.idempotent).Post("/carts/{cartId}/delivery-requote-acceptances", s.handleRequoted)
 	return r
 }
 
-func (s *Server) idempotent(route string) func(http.Handler) http.Handler {
-	return RequireIdempotencyKey(s.IdempotencyStore, s.Clock, route)
+func (s *Server) idempotent(next http.Handler) http.Handler {
+	return RequireIdempotencyKey(s.IdempotencyStore, s.Clock)(next)
 }

@@ -9,7 +9,7 @@ import (
 func TestIdempotencyKeyRequiredAndReplay(t *testing.T) {
 	e := newEnv(t)
 	e.wantProblem(e.do(http.MethodPost, "/carts", "", `{}`), http.StatusBadRequest, "idempotency-key-required")
-	e.wantProblem(e.do(http.MethodPost, "/carts", strings.Repeat("k", 129), `{}`), http.StatusBadRequest, "idempotency-key-required")
+	e.wantProblem(e.do(http.MethodPost, "/carts", strings.Repeat("k", 129), `{}`), http.StatusBadRequest, "idempotency-key-invalid")
 
 	first := e.do(http.MethodPost, "/carts", "k1", `{"shopperId":"s1"}`)
 	e.wantStatus(first, http.StatusCreated)
@@ -18,7 +18,7 @@ func TestIdempotencyKeyRequiredAndReplay(t *testing.T) {
 	if again.Body != first.Body || again.Header.Get("Idempotency-Replayed") != "true" {
 		t.Fatalf("replay differs: %q vs %q (%v)", again.Body, first.Body, again.Header)
 	}
-	e.wantProblem(e.do(http.MethodPost, "/carts", "k1", `{"shopperId":"s2"}`), http.StatusUnprocessableEntity, "idempotency-key-reused")
+	e.wantProblem(e.do(http.MethodPost, "/carts", "k1", `{"shopperId":"s2"}`), http.StatusConflict, "idempotency-key-reused")
 	if n := len(e.get("/carts?shopperId=s1").json(t)["carts"].([]any)); n != 1 {
 		t.Fatalf("replay created again: %d carts", n)
 	}

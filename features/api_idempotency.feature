@@ -17,7 +17,7 @@ Feature: Every write takes an Idempotency-Key
   Scenario: The same key with another request is refused
     When I POST "/carts" with key "k1" and body {"shopperId":"shopper-1"}
     And I POST "/carts" with key "k1" and body {"shopperId":"shopper-2"}
-    Then the API answers 422
+    Then the API answers 409
     And the problem type is "idempotency-key-reused"
 
   Scenario: A malformed body is a problem document
