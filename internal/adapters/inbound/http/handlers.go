@@ -2,11 +2,13 @@ package http
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/IQVO/shopping-cart/internal/adapters/inbound/http/page"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/application/views"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
@@ -139,6 +141,10 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	if name := page.Unknown(r, "shopperId", "state"); name != "" {
+		writeError(w, r, fmt.Errorf("%w: %s", errUnknownQueryParameter, name))
+		return
+	}
 	shopper := r.URL.Query().Get("shopperId")
 	if shopper == "" || !shared.ValidID(shopper) {
 		writeError(w, r, shared.Invalid("shopperId is required"))
