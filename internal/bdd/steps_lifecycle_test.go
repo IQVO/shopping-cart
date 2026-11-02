@@ -33,6 +33,7 @@ func registerLifecycle(sc *godog.ScenarioContext, w *world) {
 	sc.Step(`^I merge the first cart into itself$`, func() error {
 		return w.post(w.cartPath("/merges"), fmt.Sprintf(`{"targetCartId":%q}`, w.first))
 	})
+	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I POST "([^"]*)" without a key and body (.*)$`, func(path, body string) error {
 		return w.send(http.MethodPost, path, "", body)
 	})

@@ -100,3 +100,32 @@ func TestListCartsRejectsBadLimitAndCursor(t *testing.T) {
 		e.wantProblem(e.get("/carts?shopperId=shopper-1&cursor="+cursor), http.StatusBadRequest, "invalid-cursor")
 	}
 }
+
+func TestListCartsRejectsEmptyAndRepeatedPagingParameters(t *testing.T) {
+	e := newEnv(t)
+	e.newCart("shopper-1")
+	cur := page.Encode(page.Position{Sort: "2026-01-01T00:00:00Z", ID: "cart-1"})
+	cases := []struct{ name, query, slug string }{
+		{"empty limit", "limit=", "invalid-limit"},
+		{"repeated limit", "limit=1&limit=2", "invalid-limit"},
+		{"empty then garbage limit", "limit=&limit=zzz", "invalid-limit"},
+		{"garbage limit", "limit=abc", "invalid-limit"},
+		{"repeated cursor", "cursor=" + cur + "&cursor=" + cur, "invalid-cursor"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			e.wantProblem(e.get("/carts?shopperId=shopper-1&"+c.query), http.StatusBadRequest, c.slug)
+		})
+	}
+	if r := e.get("/carts?shopperId=shopper-1"); r.Status != http.StatusOK {
+		t.Fatalf("absent limit and cursor use the defaults: %d", r.Status)
+	}
+}
+
+func TestListCartsRejectsUndeclaredQueryParameters(t *testing.T) {
+	e := newEnv(t)
+	e.newCart("shopper-1")
+	for _, q := range []string{"after=x", "offset=0", "nextToken=t", "from=x"} {
+		e.wantProblem(e.get("/carts?shopperId=shopper-1&"+q), http.StatusBadRequest, "unknown-query-parameter")
+	}
+}

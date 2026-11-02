@@ -191,7 +191,7 @@ same key and the same request replays the first response with
 `DELETE` are idempotent by method and need no key. `GET /carts` is keyset-paged:
 `limit` (1 to 500, default 100) and `cursor`, answered as
 `{"items": [...], "nextCursor": "..."}` (`nextCursor` is absent on the last page;
-a bad value is `400 invalid-limit` / `invalid-cursor`). Follow `nextCursor` until
+a bad, empty or repeated `limit` is `400 invalid-limit`, a bad or repeated `cursor` is `400 invalid-cursor`, and any undeclared query parameter is `400 unknown-query-parameter`). Follow `nextCursor` until
 it is absent. See ADR [0008](docs/adr/0008-adopt-the-fleet-rest-api-guideline.md).
 
 | Method | Path | Purpose |
