@@ -1,0 +1,1 @@
+{"title":"Body","body":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["groupNo","offerId"],"properties":{"groupNo":{"type":"integer","minimum":1},"offerId":{"type":"string"}}}}}}}
