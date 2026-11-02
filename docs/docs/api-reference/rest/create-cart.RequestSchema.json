@@ -1,1 +1,1 @@
-{"title":"Body","body":{"required":false,"content":{"application/json":{"schema":{"type":"object","properties":{"shopperId":{"type":"string"}}}}}}}
+{"title":"Body","body":{"required":false,"content":{"application/json":{"schema":{"type":"object","properties":{"shopperId":{"type":"string","minLength":1,"maxLength":64,"pattern":"^[A-Za-z0-9][A-Za-z0-9._:-]*$"}}}}}}}
