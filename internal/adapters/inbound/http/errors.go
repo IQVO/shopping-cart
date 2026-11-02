@@ -13,6 +13,9 @@ import (
 // problemBase is the namespace of this service's RFC 9457 `type` URIs.
 const problemBase = "/problems/"
 
+// errUnknownQueryParameter marks a query parameter the operation does not declare.
+var errUnknownQueryParameter = errors.New("query parameter is not declared by this operation")
+
 // errMalformedRequest marks a body or parameter the adapter itself rejects
 // (bad JSON, unknown field, wrong type).
 var errMalformedRequest = errors.New("request is not valid for this operation")
@@ -34,6 +37,7 @@ var (
 	idempotencyKeyReused   = problem{http.StatusConflict, "idempotency-key-reused", "Idempotency-Key was already used with a different request"}
 	invalidLimit           = problem{http.StatusBadRequest, "invalid-limit", "limit must be an integer between 1 and 500"}
 	invalidCursor          = problem{http.StatusBadRequest, "invalid-cursor", "cursor is not a valid page token"}
+	unknownQueryParameter  = problem{http.StatusBadRequest, "unknown-query-parameter", "The request carries a query parameter this operation does not declare"}
 )
 
 func unprocessable(slug, title string) problem {
@@ -58,6 +62,7 @@ var problemCatalogue = []struct {
 	{errMalformedRequest, problem{http.StatusBadRequest, "malformed-request", "Malformed request"}},
 	{page.ErrInvalidLimit, invalidLimit},
 	{page.ErrInvalidCursor, invalidCursor},
+	{errUnknownQueryParameter, unknownQueryParameter},
 	{ports.ErrNotFound, notFound},
 	{cart.ErrLineNotFound, notFound},
 	{cart.ErrCartClosed, conflict("cart-closed", "A checked-out, abandoned or merged cart never changes")},
