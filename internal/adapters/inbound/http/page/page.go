@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"sort"
 	"strconv"
 )
 
@@ -37,26 +38,59 @@ type Position struct {
 	ID   string `json:"i"`
 }
 
-// Limit parses `limit` from the query string. Absent -> DefaultLimit.
+// Unknown returns the first query parameter of r that the collection does not declare
+// (`limit` and `cursor` are always declared; allowed lists the filters), or "" when every
+// parameter is known. A collection GET answers 400 `unknown-query-parameter` for it: a
+// consumer still sending a retired paging parameter (`after`, `from`, `offset`, `nextToken`)
+// then fails loudly instead of silently reading page one forever. Names are checked in
+// sorted order so the error is deterministic.
+func Unknown(r *http.Request, allowed ...string) string {
+	known := map[string]bool{"limit": true, "cursor": true}
+	for _, a := range allowed {
+		known[a] = true
+	}
+	var names []string
+	for name := range r.URL.Query() {
+		if !known[name] {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	sort.Strings(names)
+	return names[0]
+}
+
+// Limit parses `limit` from the query string. Absent -> DefaultLimit. A `limit` that is
+// present but empty, or repeated, is ErrInvalidLimit: the parameter is a single integer, and
+// silently taking the first value would accept a request the contract says is invalid.
 func Limit(r *http.Request) (int, error) {
-	raw := r.URL.Query().Get("limit")
-	if raw == "" {
+	vals, present := r.URL.Query()["limit"]
+	if !present {
 		return DefaultLimit, nil
 	}
-	n, err := strconv.Atoi(raw)
+	if len(vals) != 1 || vals[0] == "" {
+		return 0, ErrInvalidLimit
+	}
+	n, err := strconv.Atoi(vals[0])
 	if err != nil || n < 1 || n > MaxLimit {
 		return 0, ErrInvalidLimit
 	}
 	return n, nil
 }
 
-// After parses `cursor` from the query string. Absent -> nil (first page).
+// After parses `cursor` from the query string. Absent (or empty) -> nil (first page). A
+// repeated `cursor` is ErrInvalidCursor for the same reason a repeated `limit` is invalid.
 func After(r *http.Request) (*Position, error) {
-	raw := r.URL.Query().Get("cursor")
-	if raw == "" {
+	vals := r.URL.Query()["cursor"]
+	if len(vals) > 1 {
+		return nil, ErrInvalidCursor
+	}
+	if len(vals) == 0 || vals[0] == "" {
 		return nil, nil
 	}
-	return Decode(raw)
+	return Decode(vals[0])
 }
 
 // Encode makes the opaque cursor for a position.

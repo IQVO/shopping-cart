@@ -26,7 +26,7 @@ info:
     an Idempotency-Key header: a retry with the same key and the same request replays
     the first answer (Idempotency-Replayed: true), the same key with another request is
     409 idempotency-key-reused. PUT and DELETE are idempotent by method. GET /carts
-    is keyset-paged ({items, nextCursor}; invalid-limit and invalid-cursor are 400).
+    is keyset-paged ({items, nextCursor}; invalid-limit, invalid-cursor and unknown-query-parameter are 400).
     No authentication; shopperId is optional (guest-first).
 servers:
   - url: http://localhost:8080
@@ -100,7 +100,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/CartPage'
         '400':
-          description: invalid-limit (limit is not an integer from 1 to 500), invalid-cursor (cursor does not decode) or malformed-request.
+          description: invalid-limit (limit is empty, repeated or not an integer from 1 to 500), invalid-cursor (cursor is repeated or does not decode), unknown-query-parameter (a query parameter this operation does not declare; the first offender is named) or malformed-request.
           content:
             application/problem+json:
               schema:
