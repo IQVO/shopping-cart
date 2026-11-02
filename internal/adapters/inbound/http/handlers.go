@@ -2,11 +2,13 @@ package http
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/IQVO/shopping-cart/internal/adapters/inbound/http/page"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/application/views"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
@@ -40,8 +42,8 @@ func respond(w http.ResponseWriter, r *http.Request, status int, v views.Cart, e
 	writeJSON(w, status, cartOut(v))
 }
 
-// command serves a POST that decodes body B and runs it on the cart of the
-// path; the success status is 200.
+// command serves a POST or PUT that decodes body B and runs it on the cart of
+// the path; the success status is 200.
 func command[B any](w http.ResponseWriter, r *http.Request, run func(r *http.Request, cartID string, body B) (views.Cart, error)) {
 	id, ok := pathID(w, r, "cartId")
 	if !ok {
@@ -139,6 +141,10 @@ func (s *Server) handleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	if name := page.Unknown(r, "shopperId", "state"); name != "" {
+		writeError(w, r, fmt.Errorf("%w: %s", errUnknownQueryParameter, name))
+		return
+	}
 	shopper := r.URL.Query().Get("shopperId")
 	if shopper == "" || !shared.ValidID(shopper) {
 		writeError(w, r, shared.Invalid("shopperId is required"))
@@ -149,14 +155,15 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, shared.Invalid("state must be OPEN, CHECKED_OUT, ABANDONED or MERGED"))
 		return
 	}
-	carts, err := s.ListCarts.Execute(r.Context(), shopper, state)
+	limit, after, err := pageParams(r)
 	if err != nil {
 		writeError(w, r, err)
 		return
 	}
-	out := cartListBody{Carts: make([]cartBody, len(carts))}
-	for i, v := range carts {
-		out.Carts[i] = cartOut(v)
+	res, err := s.ListCarts.Execute(r.Context(), shopper, state, after, limit)
+	if err != nil {
+		writeError(w, r, err)
+		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	writeJSON(w, http.StatusOK, cartPageOut(res.Items, res.Next))
 }

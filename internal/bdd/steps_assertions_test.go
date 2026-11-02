@@ -152,7 +152,7 @@ func registerCartAssertions(sc *godog.ScenarioContext, w *world) {
 		return nil
 	})
 	sc.Step(`^the answer is a replay$`, func() error {
-		if w.header.Get("Idempotent-Replayed") != "true" {
+		if w.header.Get("Idempotency-Replayed") != "true" {
 			return fmt.Errorf("the answer is not a replay: %v", w.header)
 		}
 		return nil
@@ -161,7 +161,7 @@ func registerCartAssertions(sc *godog.ScenarioContext, w *world) {
 		if err := w.get("/carts?shopperId=" + shopper); err != nil {
 			return err
 		}
-		v, _ := w.lookup("carts")
+		v, _ := w.lookup("items")
 		if arr, _ := v.([]any); len(arr) != n {
 			return fmt.Errorf("shopper has %d carts, want %d", len(arr), n)
 		}

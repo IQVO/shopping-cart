@@ -37,7 +37,7 @@ delivery-promise adds an optional `timeZone` (IANA name) to `DeliveryWindow` (br
    provider cannot grow its memory; past the bound a name is still resolved, without caching or a warning.
 3. The cart contract is unchanged in shape: `deliverByEarliest` / `deliverByLatest` stay `format: date`, and
    `apis/openapi.yaml` now says they are days of the destination's local calendar.
-4. `POST /carts/{cartId}/delivery/requoted` receives dates, not windows: the cart stores what the caller sends
+4. `POST /carts/{cartId}/delivery-requote-acceptances` receives dates, not windows: the cart stores what the caller sends
    and converts nothing. The A2A adapter only renders stored dates. Neither path changes; the contract
    description states the meaning a sender must honour.
 5. `cmd/api/tzdata.go` imports `time/tzdata`, so a zone resolves on any base image, not only one that ships the zone
@@ -52,5 +52,5 @@ delivery-promise adds an optional `timeZone` (IANA name) to `DeliveryWindow` (br
 - Carts already holding a quote keep their UTC dates until they are re-quoted (a quote expires in minutes).
 - Until delivery-promise ships the field, every window logs one WARN for the empty name and dates stay UTC:
   the fallback is today's behaviour, so the two repos can merge in either order.
-- A sender of `delivery/requoted` that still formats windows in UTC sends UTC days; that is the sender's
+- A sender of `delivery-requote-acceptances` that still formats windows in UTC sends UTC days; that is the sender's
   mapping to fix, not something the cart can detect.

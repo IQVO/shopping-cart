@@ -56,7 +56,7 @@ func TestGatewaySendsTheQuoteRequestOfTheSpec(t *testing.T) {
 	if _, err := g.Quote(context.Background(), "key-7", "787", cartLines); err != nil {
 		t.Fatal(err)
 	}
-	if got.method != "POST" || got.path != "/delivery-offers:quote" || got.key != "key-7" || got.contentType != "application/json" {
+	if got.method != "POST" || got.path != "/delivery-quotes" || got.key != "key-7" || got.contentType != "application/json" {
 		t.Fatalf("request = %+v", got)
 	}
 	if got.body["destinationPostalPrefix"] != "787" || len(got.body) != 2 {
@@ -124,6 +124,16 @@ func TestAGroupKnownOnlyByAConstraintSpansEveryLineWhenAlone(t *testing.T) {
 	q, err := g.Quote(context.Background(), "k", "787", cartLines)
 	if err != nil || len(q.Groups) != 1 || len(q.Groups[0].Offers) != 0 || len(q.Groups[0].LineNos) != 2 {
 		t.Fatalf("%+v %v", q, err)
+	}
+}
+
+func TestGatewayNeverSendsAQuoteWithoutAnIdempotencyKey(t *testing.T) {
+	g, got := serve(t, 200, "application/json", `{"offers":[],"unavailable":[]}`)
+	if _, err := g.Quote(context.Background(), "", "787", cartLines); !errors.Is(err, ports.ErrQuoteRejected) {
+		t.Fatalf("got %v, want ErrQuoteRejected", err)
+	}
+	if got.method != "" {
+		t.Fatalf("a keyless quote must not reach delivery-promise: %+v", got)
 	}
 }
 

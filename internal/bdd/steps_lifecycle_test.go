@@ -28,11 +28,12 @@ func registerLifecycle(sc *godog.ScenarioContext, w *world) {
 		return w.consumer().ApplyCheckoutCompleted(context.Background(), w.meta(), usecases.CheckoutCompleted{CartID: id, SessionID: "sess-x"})
 	})
 	sc.Step(`^I merge the first cart into the second cart$`, func() error {
-		return w.post(w.cartPath(":merge-into"), fmt.Sprintf(`{"targetCartId":%q}`, w.second))
+		return w.post(w.cartPath("/merges"), fmt.Sprintf(`{"targetCartId":%q}`, w.second))
 	})
 	sc.Step(`^I merge the first cart into itself$`, func() error {
-		return w.post(w.cartPath(":merge-into"), fmt.Sprintf(`{"targetCartId":%q}`, w.first))
+		return w.post(w.cartPath("/merges"), fmt.Sprintf(`{"targetCartId":%q}`, w.first))
 	})
+	sc.Step(`^I GET "([^"]*)"$`, w.get)
 	sc.Step(`^I POST "([^"]*)" without a key and body (.*)$`, func(path, body string) error {
 		return w.send(http.MethodPost, path, "", body)
 	})

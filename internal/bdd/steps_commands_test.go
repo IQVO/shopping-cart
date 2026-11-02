@@ -25,22 +25,22 @@ func registerCommands(sc *godog.ScenarioContext, w *world) {
 	})
 	sc.Step(`^the cart holds 100 lines$`, w.fillCart)
 	sc.Step(`^I set the quantity of "([^"]*)" to (\d+)$`, func(item string, q int) error {
-		return w.post(w.cartPath("/lines/"+url.PathEscape(item)+":set-quantity"), fmt.Sprintf(`{"quantity":%d}`, q))
+		return w.put(w.cartPath("/lines/"+url.PathEscape(item)), fmt.Sprintf(`{"quantity":%d}`, q))
 	})
-	sc.Step(`^I remove "([^"]*)"$`, func(item string) error { return w.post(w.cartPath("/lines/"+url.PathEscape(item)+":remove"), "") })
+	sc.Step(`^I remove "([^"]*)"$`, func(item string) error { return w.del(w.cartPath("/lines/" + url.PathEscape(item))) })
 	sc.Step(`^I set the destination "([^"]*)"$`, func(p string) error {
-		return w.post(w.cartPath(":set-destination"), fmt.Sprintf(`{"destinationPostalPrefix":%q}`, p))
+		return w.put(w.cartPath("/destination"), fmt.Sprintf(`{"destinationPostalPrefix":%q}`, p))
 	})
-	sc.Step(`^I quote delivery$`, func() error { return w.post(w.cartPath(":quote-delivery"), "") })
+	sc.Step(`^I quote delivery$`, func() error { return w.post(w.cartPath("/delivery-quotes"), "") })
 	sc.Step(`^I select offer "([^"]*)" for group (\d+)$`, func(offer string, group int) error {
-		return w.post(w.cartPath(":select-delivery"), fmt.Sprintf(`{"groupNo":%d,"offerId":%q}`, group, offer))
+		return w.put(w.cartPath("/delivery-selection"), fmt.Sprintf(`{"groupNo":%d,"offerId":%q}`, group, offer))
 	})
 	sc.Step(`^I accept the requoted offer "([^"]*)" (\w+) for group (\d+) expiring in (\d+) minutes$`, func(offer, tier string, group, min int) error {
 		exp := w.clock.Now().Add(time.Duration(min) * time.Minute).Format(time.RFC3339)
-		return w.post(w.cartPath("/delivery/requoted"), fmt.Sprintf(
+		return w.post(w.cartPath("/delivery-requote-acceptances"), fmt.Sprintf(
 			`{"offers":[{"offerId":%q,"groupNo":%d,"tier":%q,"deliverByEarliest":"2026-10-27","deliverByLatest":"2026-10-28","expiresAt":%q}]}`, offer, group, tier, exp))
 	})
-	sc.Step(`^I accept no requoted offers$`, func() error { return w.post(w.cartPath("/delivery/requoted"), `{"offers":[]}`) })
+	sc.Step(`^I accept no requoted offers$`, func() error { return w.post(w.cartPath("/delivery-requote-acceptances"), `{"offers":[]}`) })
 	sc.Step(`^I read the cart$`, func() error { return w.get(w.cartPath("")) })
 }
 

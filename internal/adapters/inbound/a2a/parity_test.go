@@ -92,7 +92,7 @@ func TestListShopperCartsAnswersExactlyWhatRESTGETReturns(t *testing.T) {
 			if env.Problem != nil || env.Data == nil || env.Data.Carts == nil {
 				t.Fatalf("envelope = %+v", env)
 			}
-			got := map[string]any{"carts": toAnySlice(t, env.Data.Carts.Carts)}
+			got := map[string]any{"items": toAnySlice(t, env.Data.Carts.Carts)}
 			if want := restGET(t, rest, "/carts"+tc.query); !reflect.DeepEqual(got, want) {
 				t.Fatalf("A2A list differs from the REST GET:\n a2a: %v\nrest: %v", got, want)
 			}

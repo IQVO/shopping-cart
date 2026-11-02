@@ -40,6 +40,7 @@ func Run(t *testing.T, newEnv func(t *testing.T) Env) {
 	suites := map[string]func(*testing.T, Env){
 		"carts":         testCarts,
 		"listbyshopper": listByShopper,
+		"listpages":     listByShopperPages,
 		"listidle":      listIdle,
 		"deleteclosed":  deleteClosed,
 		"items":         testItems,

@@ -67,8 +67,14 @@ func fakeDeliveryPromise(t *testing.T) *fakeDP {
 	t.Helper()
 	f := &fakeDP{}
 	f.Server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/delivery-offers:quote" || r.Method != http.MethodPost {
+		if r.URL.Path != "/delivery-quotes" || r.Method != http.MethodPost {
 			http.NotFound(w, r)
+			return
+		}
+		if r.Header.Get("Idempotency-Key") == "" { // the provider's R3: every POST is keyed
+			w.Header().Set("Content-Type", "application/problem+json")
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(`{"type":"/problems/idempotency-key-required","title":"Idempotency-Key header is required","status":400}`))
 			return
 		}
 		f.mu.Lock()

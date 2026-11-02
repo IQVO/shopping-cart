@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/IQVO/shopping-cart/internal/application/idempotency"
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/application/readmodel"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 	"github.com/IQVO/shopping-cart/internal/domain/estimate"
@@ -29,9 +30,11 @@ type CartRepository interface {
 	// Save persists the cart snapshot under the concurrency rule of the
 	// package comment.
 	Save(ctx context.Context, c *cart.Cart) error
-	// ListByShopper returns the shopper's carts, newest first, optionally only
-	// those in state (empty state means every state).
-	ListByShopper(ctx context.Context, shopperID string, state cart.State) ([]*cart.Cart, error)
+	// ListByShopper returns up to limit of the shopper's carts ordered by
+	// (created-at, id) descending, optionally only those in state (empty state
+	// means every state). A non-nil after resumes strictly after that keyset,
+	// so carts sharing a created-at are never skipped or repeated.
+	ListByShopper(ctx context.Context, shopperID string, state cart.State, after *pagination.Keyset, limit int) ([]*cart.Cart, error)
 	// ListIdleOpen returns up to limit OPEN carts last changed at or before the
 	// instant, oldest first (policy AbandonInactive).
 	ListIdleOpen(ctx context.Context, cutoff time.Time, limit int) ([]*cart.Cart, error)
@@ -80,7 +83,7 @@ type TaxTableRepository interface {
 }
 
 // QuoteOffers is the cart's only synchronous dependency: delivery-promise
-// QuoteDeliveryOffers (REST POST /delivery-offers:quote).
+// QuoteDeliveryOffers (REST POST /delivery-quotes).
 type QuoteOffers interface {
 	// Quote asks for the offers of the lines to the destination prefix and
 	// returns them as a cart quote stamped quotedAt. The idempotency key is
@@ -106,18 +109,30 @@ type EventOutbox interface {
 // UnitOfWork runs fn as ONE atomic unit: every repository, inbox and outbox
 // call fn makes with the ctx it is handed commits together when fn returns
 // nil, or rolls back together when fn returns an error (or panics). Do is
-// re-entrant; the error fn returns is returned unchanged.
+// re-entrant; the error fn returns is returned unchanged. A Do inside a Do
+// joins the outer unit but is atomic on its own: when the inner fn fails only
+// the inner writes are undone (the retry loops of the use cases rely on it).
 type UnitOfWork interface {
 	Do(ctx context.Context, fn func(ctx context.Context) error) error
 }
 
-// IdempotencyStore remembers the first response per (route, key) for 24 hours.
+// IdempotencyStore remembers the first answer per Idempotency-Key for 24 hours and
+// serialises the requests that share a key (REST guideline 2.3 and 2.5). The key is
+// global: the same key on another route is a different fingerprint (a reuse).
 type IdempotencyStore interface {
-	// Get returns the stored record, or ErrNotFound (expired records are
-	// treated as absent).
-	Get(ctx context.Context, route, key string) (idempotency.Record, error)
-	// Put stores the record unless one exists; it reports whether it stored.
-	Put(ctx context.Context, route, key string, rec idempotency.Record) (bool, error)
+	// Do runs fn at most once for a live key.
+	//
+	// A live record is returned with replayed true and fn does not run; the
+	// caller compares the record's RequestHash with its own. Otherwise Do claims
+	// the key and runs fn with a ctx that carries the unit of work: everything fn
+	// writes through the repositories, the outbox included, commits atomically
+	// with the record fn returns, stamped with at. A record with a status below
+	// 500 is stored (a 4xx too, so a retry is deterministic). A 5xx record, an
+	// error or a panic rolls everything back and stores nothing, so the retry
+	// runs fn again. A concurrent Do for the same key waits for the claimant,
+	// then replays its answer (or runs fn itself when nothing was stored).
+	Do(ctx context.Context, key, requestHash string, at time.Time,
+		fn func(ctx context.Context) (idempotency.Record, error)) (rec idempotency.Record, replayed bool, err error)
 }
 
 // Clock is the service's notion of "now"; use cases stamp aggregates with it.

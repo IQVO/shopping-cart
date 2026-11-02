@@ -65,7 +65,7 @@ channels:
     address: retailnetwork.offer-availability.events
     title: offer-availability integration topic (consumed)
     description: Produced by offer-availability (Conformist). Consumer group from OFFER_AVAILABILITY_CONSUMER_GROUP. Idempotent on the CloudEvents
-      id (inbox), dispatch on the full type, dead-letter on poison messages.
+      id (inbox), dispatch on the full type. Handling - a message that is not a CloudEvents 1.0 event, or of a type this service does not handle, is skipped (offset committed); a handled type whose payload can never be applied (undecodable `data`, a missing or invalid required field) is dead-lettered at once to `retailnetwork.offer-availability.events.dlq`; a transient failure is retried up to 5 times with capped backoff, then dead-lettered to the same topic.
     messages:
       CatalogItemCreated:
         $ref: '#/components/messages/ConsumedCatalogItemCreated'
@@ -74,7 +74,7 @@ channels:
   pricingEvents:
     address: retailnetwork.pricing.events
     title: pricing integration topic (consumed)
-    description: Produced by pricing (Customer/Supplier). Consumer group from PRICING_CONSUMER_GROUP.
+    description: Produced by pricing (Customer/Supplier). Consumer group from PRICING_CONSUMER_GROUP. Idempotent on the CloudEvents id (inbox), dispatch on the full type. Handling - a message that is not a CloudEvents 1.0 event, or of a type this service does not handle, is skipped (offset committed); a handled type whose payload can never be applied (undecodable `data`, a missing or invalid required field) is dead-lettered at once to `retailnetwork.pricing.events.dlq`; a transient failure is retried up to 5 times with capped backoff, then dead-lettered to the same topic.
     messages:
       ItemPriceChanged:
         $ref: '#/components/messages/ConsumedItemPriceChanged'
@@ -87,7 +87,7 @@ channels:
   checkoutEvents:
     address: retailnetwork.checkout.events
     title: checkout integration topic (consumed)
-    description: Produced by checkout (Customer/Supplier). Consumer group from CHECKOUT_CONSUMER_GROUP.
+    description: Produced by checkout (Customer/Supplier). Consumer group from CHECKOUT_CONSUMER_GROUP. Idempotent on the CloudEvents id (inbox), dispatch on the full type. Handling - a message that is not a CloudEvents 1.0 event, or of a type this service does not handle, is skipped (offset committed); a handled type whose payload can never be applied (undecodable `data`, a missing or invalid required field) is dead-lettered at once to `retailnetwork.checkout.events.dlq`; a transient failure is retried up to 5 times with capped backoff, then dead-lettered to the same topic.
     messages:
       CheckoutCompleted:
         $ref: '#/components/messages/ConsumedCheckoutCompleted'

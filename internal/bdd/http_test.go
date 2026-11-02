@@ -35,6 +35,18 @@ func (w *world) post(path, body string) error {
 	return w.send(http.MethodPost, path, fmt.Sprintf("key-%d", w.keys), body)
 }
 
+// put and del send a fresh Idempotency-Key as well: PUT and DELETE are
+// idempotent by method, so the service accepts the key and ignores it.
+func (w *world) put(path, body string) error {
+	w.keys++
+	return w.send(http.MethodPut, path, fmt.Sprintf("key-%d", w.keys), body)
+}
+
+func (w *world) del(path string) error {
+	w.keys++
+	return w.send(http.MethodDelete, path, fmt.Sprintf("key-%d", w.keys), "")
+}
+
 func (w *world) get(path string) error { return w.send(http.MethodGet, path, "", "") }
 
 // mustPost is post for setup steps: any non-2xx answer fails the step.

@@ -58,14 +58,14 @@ its AsyncAPI.
 
 ### The synchronous call
 
-`QuoteDeliveryOffers`: `POST /delivery-offers:quote` on delivery-promise (the network's
+`QuoteDeliveryOffers`: `POST /delivery-quotes` on delivery-promise (the network's
 Open Host Service route for the `shopper / storefront` caller). The outbound port is
 `ports.QuoteOffers`; the HTTP adapter is `internal/adapters/outbound/deliverypromise`
 with a 5 s timeout (`DELIVERY_PROMISE_TIMEOUT`); the fake is
 `memory.Quoter`. A contract test checks the request and a response example against a
 byte copy of the network OpenAPI (`internal/adapters/outbound/deliverypromise/testdata`,
 source commit recorded in its README). The cart never calls an in-org or restricted
-route (`POST /promises`, `:confirm`, `:cancel`).
+route (`POST /promises`, `/promises/{promiseId}/confirmations`, `/promises/{promiseId}/cancellations`).
 
 ## Consequences
 

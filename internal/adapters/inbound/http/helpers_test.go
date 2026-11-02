@@ -99,6 +99,15 @@ func (e *env) post(path, body string) reply {
 
 func (e *env) get(path string) reply { e.t.Helper(); return e.do(http.MethodGet, path, "", "") }
 
+// put sends a PUT: idempotent by method, so it takes no Idempotency-Key.
+func (e *env) put(path, body string) reply {
+	e.t.Helper()
+	return e.do(http.MethodPut, path, "", body)
+}
+
+// del sends a DELETE (idempotent by method, no Idempotency-Key).
+func (e *env) del(path string) reply { e.t.Helper(); return e.do(http.MethodDelete, path, "", "") }
+
 func (e *env) wantStatus(r reply, status int) {
 	e.t.Helper()
 	if r.Status != status {
