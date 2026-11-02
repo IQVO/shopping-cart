@@ -24,7 +24,7 @@ func pageParams(r *http.Request) (limit int, after *pagination.Keyset, err error
 	}
 	at, perr := time.Parse(time.RFC3339Nano, pos.Sort)
 	if perr != nil {
-		return 0, nil, fmt.Errorf("%w: %v", page.ErrInvalidCursor, perr)
+		return 0, nil, fmt.Errorf("%w: %w", page.ErrInvalidCursor, perr)
 	}
 	return limit, &pagination.Keyset{CreatedAt: at, ID: pos.ID}, nil
 }
