@@ -73,7 +73,7 @@ func TestTheShippedBinaryIsWiredEndToEnd(t *testing.T) {
 		t.Fatalf("create = %d %s", created.status, created.body)
 	}
 	cartID := created.json(t)["cartId"].(string)
-	if again := svc.call(t, "POST", "/carts", "create-1", `{"shopperId":"shopper-1"}`); again.body != created.body || again.header.Get("Idempotent-Replayed") != "true" {
+	if again := svc.call(t, "POST", "/carts", "create-1", `{"shopperId":"shopper-1"}`); again.body != created.body || again.header.Get("Idempotency-Replayed") != "true" {
 		t.Fatalf("replay = %d %s", again.status, again.body)
 	}
 	addFirstLine(t, svc, cartID)
@@ -90,6 +90,7 @@ func TestTheShippedBinaryIsWiredEndToEnd(t *testing.T) {
 		t.Fatalf("after restart = %d %s", got.status, got.body)
 	}
 	t.Run("an idle cart is abandoned and later purged by the schedulers", func(t *testing.T) { idleCartLifecycle(t, svc, dsn) })
+	t.Run("the Idempotency-Key contract holds over the shipped binary and Postgres", func(t *testing.T) { idempotencyOverPostgres(t, svc) })
 	t.Run("readyz is 503 dependency-unavailable while kafka is down", func(t *testing.T) { assertKafkaDownReadiness(t, svc) })
 }
 
@@ -103,15 +104,15 @@ func assertAnalytics(t *testing.T, cartID string, n int, last string) {
 
 func quoteSelectAndCheckOut(t *testing.T, svc *service, cartID string, dp *fakeDP) {
 	t.Helper()
-	if r := svc.call(t, "POST", "/carts/"+cartID+":quote-delivery", "quote-0", ""); r.status != 422 || r.json(t)["type"] != "/problems/no-destination" {
+	if r := svc.call(t, "POST", "/carts/"+cartID+"/delivery-quotes", "quote-0", ""); r.status != 422 || r.json(t)["type"] != "/problems/no-destination" {
 		t.Fatalf("quote without destination = %d %s", r.status, r.body)
 	}
-	svc.call(t, "POST", "/carts/"+cartID+":set-destination", "dest-1", `{"destinationPostalPrefix":"787"}`)
-	quoted := svc.call(t, "POST", "/carts/"+cartID+":quote-delivery", "quote-1", "")
+	svc.call(t, "PUT", "/carts/"+cartID+"/destination", "dest-1", `{"destinationPostalPrefix":"787"}`)
+	quoted := svc.call(t, "POST", "/carts/"+cartID+"/delivery-quotes", "quote-1", "")
 	if quoted.status != 200 || dp.callCount() != 1 || dp.keys[0] != "quote-1" {
 		t.Fatalf("quote = %d %s (calls %d)", quoted.status, quoted.body, dp.callCount())
 	}
-	selected := svc.call(t, "POST", "/carts/"+cartID+":select-delivery", "sel-1", `{"groupNo":1,"offerId":"of-1"}`).json(t)
+	selected := svc.call(t, "PUT", "/carts/"+cartID+"/delivery-selection", "sel-1", `{"groupNo":1,"offerId":"of-1"}`).json(t)
 	est := selected["estimate"].(map[string]any)
 	// goods 2 x 1000 + NEXT_DAY 1200 = 3200; 10% tax = 320; total 3520.
 	if est["totalMinor"].(float64) != 3520 || est["estimateComplete"] != true || selected["checkoutReadiness"].(map[string]any)["ready"] != true {

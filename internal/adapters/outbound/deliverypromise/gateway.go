@@ -1,6 +1,6 @@
 // Package deliverypromise is the outbound HTTP client of delivery-promise, the
 // only synchronous call shopping-cart makes (the model's sync_calls
-// QuoteDeliveryOffers, REST POST /delivery-offers:quote on the network's Open
+// QuoteDeliveryOffers, REST POST /delivery-quotes on the network's Open
 // Host Service). It restates the one route it uses and nothing else; the DTOs
 // here are not shared with the service.
 package deliverypromise
@@ -26,7 +26,7 @@ const DefaultTimeout = 5 * time.Second
 // maxResponseBytes bounds what the client reads of one response.
 const maxResponseBytes = 1 << 20
 
-const quotePath = "/delivery-offers:quote"
+const quotePath = "/delivery-quotes"
 
 // Gateway implements ports.QuoteOffers over HTTP.
 type Gateway struct {
@@ -111,9 +111,13 @@ type quoteResponse struct {
 	Unavailable []unavailableDTO `json:"unavailable"`
 }
 
-// Quote implements ports.QuoteOffers: POST /delivery-offers:quote with the
+// Quote implements ports.QuoteOffers: POST /delivery-quotes with the
 // cart's lines and the destination prefix, forwarding the Idempotency-Key.
 func (g *Gateway) Quote(ctx context.Context, idempotencyKey, destination string, lines []cart.Line) (cart.DeliveryQuote, error) {
+	if idempotencyKey == "" {
+		// delivery-promise answers 400 idempotency-key-required to a keyless POST; never send it.
+		return cart.DeliveryQuote{}, fmt.Errorf("%w: POST %s needs an Idempotency-Key", ports.ErrQuoteRejected, quotePath)
+	}
 	req := quoteRequest{DestinationPostalPrefix: destination, Lines: make([]lineDTO, len(lines))}
 	for i, l := range lines {
 		req.Lines[i] = lineDTO(l)
@@ -140,9 +144,7 @@ func (g *Gateway) post(ctx context.Context, key string, body, out any) error {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json, application/problem+json")
-	if key != "" {
-		req.Header.Set("Idempotency-Key", key)
-	}
+	req.Header.Set("Idempotency-Key", key)
 	resp, err := g.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("%w: %w", ports.ErrDeliveryPromiseUnavailable, err)

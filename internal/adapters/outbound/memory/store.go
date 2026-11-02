@@ -27,8 +27,6 @@ import (
 	"github.com/IQVO/shopping-cart/internal/domain/shared"
 )
 
-type idemKey struct{ route, key string }
-
 // Store is the shared state of the in-memory doubles.
 type Store struct {
 	mu          sync.Mutex
@@ -38,7 +36,7 @@ type Store struct {
 	taxTable    *estimate.TaxTable
 	inbox       map[string]string
 	outbox      []shared.Event
-	idempotency map[idemKey]idempotency.Record
+	idempotency map[string]idempotency.Record
 	clock       ports.Clock
 }
 
@@ -49,7 +47,7 @@ type Store struct {
 func NewStore(clock ports.Clock) *Store {
 	return &Store{
 		carts: map[cart.ID]cart.Snapshot{}, items: map[string]readmodel.Item{},
-		inbox: map[string]string{}, idempotency: map[idemKey]idempotency.Record{}, clock: clock,
+		inbox: map[string]string{}, idempotency: map[string]idempotency.Record{}, clock: clock,
 	}
 }
 

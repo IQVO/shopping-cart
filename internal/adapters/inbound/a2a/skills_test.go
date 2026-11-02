@@ -15,6 +15,7 @@ import (
 	"github.com/a2aproject/a2a-go/v2/a2asrv"
 
 	"github.com/IQVO/shopping-cart/internal/adapters/outbound/memory"
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
@@ -396,7 +397,7 @@ type failingCarts struct{ ports.CartRepository }
 var errBoom = errors.New("pgx: connection refused to 10.0.0.7:5432 password=hunter2")
 
 func (failingCarts) Get(context.Context, cart.ID) (*cart.Cart, error) { return nil, errBoom }
-func (failingCarts) ListByShopper(context.Context, string, cart.State) ([]*cart.Cart, error) {
+func (failingCarts) ListByShopper(context.Context, string, cart.State, *pagination.Keyset, int) ([]*cart.Cart, error) {
 	return nil, errBoom
 }
 

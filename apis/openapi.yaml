@@ -21,8 +21,13 @@ info:
     (application/problem+json) whose type is /problems/<slug>; shared types
     are not-found (404), illegal-transition (409), concurrent-update (409)
     and validation-failed (422), plus one kebab-case slug per Err of the
-    model. Every write takes an Idempotency-Key header. No authentication;
-    shopperId is optional (guest-first).
+    model, and the idempotency problems idempotency-key-required and
+    idempotency-key-invalid (400) and idempotency-key-reused (409). Every POST takes
+    an Idempotency-Key header: a retry with the same key and the same request replays
+    the first answer (Idempotency-Replayed: true), the same key with another request is
+    409 idempotency-key-reused. PUT and DELETE are idempotent by method. GET /carts
+    is keyset-paged ({items, nextCursor}; invalid-limit and invalid-cursor are 400).
+    No authentication; shopperId is optional (guest-first).
 servers:
   - url: http://localhost:8080
 tags:
@@ -53,17 +58,27 @@ paths:
       responses:
         '201':
           description: The created cart (OPEN).
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
+        '409':
+          $ref: '#/components/responses/IdempotencyKeyReused'
         '422':
           $ref: '#/components/responses/Unprocessable'
     get:
       tags: [Carts]
       operationId: listCarts
       summary: List carts of a shopper
-      description: ListCarts, filtered by shopperId and optionally state.
+      description: >-
+        ListCarts, filtered by shopperId and optionally state, newest first
+        (createdAt, cartId descending). Keyset-paged: follow nextCursor until
+        it is absent and repeat the filters on every page request.
       parameters:
         - name: shopperId
           in: query
@@ -75,13 +90,21 @@ paths:
           required: false
           schema:
             $ref: '#/components/schemas/CartState'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
       responses:
         '200':
-          description: The matching carts.
+          description: One page of the matching carts.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CartList'
+                $ref: '#/components/schemas/CartPage'
+        '400':
+          description: invalid-limit (limit is not an integer from 1 to 500), invalid-cursor (cursor does not decode) or malformed-request.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/Problem'
         '422':
           $ref: '#/components/responses/Unprocessable'
   /carts/{cartId}:
@@ -126,14 +149,19 @@ paths:
       responses:
         '200':
           description: The updated cart.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: cart-closed (ErrCartClosed) or concurrent-update.
+          description: cart-closed (ErrCartClosed), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
@@ -144,16 +172,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /carts/{cartId}/lines/{catalogItemId}:set-quantity:
-    post:
+  /carts/{cartId}/lines/{catalogItemId}:
+    put:
       tags: [Lines]
       operationId: setCartLineQuantity
       summary: Set the quantity of a cart line
-      description: SetLineQuantity. Clears the current delivery quote and selections.
+      description: >-
+        SetLineQuantity. Replaces the quantity of the line of the item.
+        Idempotent by method (no Idempotency-Key). Clears the current delivery
+        quote and selections.
       parameters:
         - $ref: '#/components/parameters/CartId'
         - $ref: '#/components/parameters/CatalogItemId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -187,16 +217,16 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /carts/{cartId}/lines/{catalogItemId}:remove:
-    post:
+    delete:
       tags: [Lines]
       operationId: removeCartLine
       summary: Remove a cart line
-      description: RemoveLine. Clears the current delivery quote and selections.
+      description: >-
+        RemoveLine. Idempotent by method (no Idempotency-Key). Clears the
+        current delivery quote and selections.
       parameters:
         - $ref: '#/components/parameters/CartId'
         - $ref: '#/components/parameters/CatalogItemId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
           description: The updated cart.
@@ -212,15 +242,17 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /carts/{cartId}:set-destination:
-    post:
+  /carts/{cartId}/destination:
+    put:
       tags: [Delivery]
       operationId: setCartDestination
       summary: Set the destination postal prefix
-      description: SetDestination. Clears the current delivery quote and selections.
+      description: >-
+        SetDestination. Replaces the destination of the cart. Idempotent by
+        method (no Idempotency-Key). Clears the current delivery quote and
+        selections.
       parameters:
         - $ref: '#/components/parameters/CartId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -249,14 +281,15 @@ paths:
                 $ref: '#/components/schemas/Problem'
         '422':
           $ref: '#/components/responses/Unprocessable'
-  /carts/{cartId}:quote-delivery:
+  /carts/{cartId}/delivery-quotes:
     post:
       tags: [Delivery]
       operationId: quoteCartDelivery
       summary: Quote delivery offers for the cart
       description: >-
-        QuoteDelivery. Calls delivery-promise POST /delivery-offers:quote
-        (network OHS) synchronously and stores the returned quote: groups with
+        QuoteDelivery. Calls delivery-promise POST /delivery-quotes
+        (network OHS, with the request's Idempotency-Key) synchronously and
+        stores the returned quote: groups with
         their lines and offers (offerId, tier, window, expiresAt) plus the
         unavailable tiers. The quote holds no capacity. Publishes
         CartDeliveryQuoted (analytics).
@@ -266,14 +299,19 @@ paths:
       responses:
         '200':
           description: The cart with its fresh delivery quote.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: cart-closed (ErrCartClosed) or concurrent-update.
+          description: cart-closed (ErrCartClosed), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
@@ -290,17 +328,17 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /carts/{cartId}:select-delivery:
-    post:
+  /carts/{cartId}/delivery-selection:
+    put:
       tags: [Delivery]
       operationId: selectCartDelivery
       summary: Select a delivery offer for a shipment group
       description: >-
-        SelectDelivery. The selection must name an offer of the current quote
-        (ErrStaleDeliverySelection).
+        SelectDelivery. Replaces the selection of one shipment group. The
+        selection must name an offer of the current quote
+        (ErrStaleDeliverySelection). Idempotent by method (no Idempotency-Key).
       parameters:
         - $ref: '#/components/parameters/CartId'
-        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -331,7 +369,7 @@ paths:
                 $ref: '#/components/schemas/Problem'
         '422':
           $ref: '#/components/responses/Unprocessable'
-  /carts/{cartId}:merge-into:
+  /carts/{cartId}/merges:
     post:
       tags: [Carts]
       operationId: mergeCartInto
@@ -353,14 +391,19 @@ paths:
       responses:
         '200':
           description: The target cart after the merge.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: cart-closed (ErrCartClosed) or concurrent-update.
+          description: cart-closed (ErrCartClosed), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
@@ -371,7 +414,7 @@ paths:
             application/problem+json:
               schema:
                 $ref: '#/components/schemas/Problem'
-  /carts/{cartId}/delivery/requoted:
+  /carts/{cartId}/delivery-requote-acceptances:
     post:
       tags: [Delivery]
       operationId: acceptRequotedOffers
@@ -405,14 +448,19 @@ paths:
       responses:
         '200':
           description: The updated cart with the requoted selection.
+          headers:
+            Idempotency-Replayed:
+              $ref: '#/components/headers/IdempotencyReplayed'
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Cart'
+        '400':
+          $ref: '#/components/responses/IdempotencyKeyProblem'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
-          description: cart-closed (ErrCartClosed) or concurrent-update.
+          description: cart-closed (ErrCartClosed), concurrent-update or idempotency-key-reused (the Idempotency-Key was already used with a different request).
           content:
             application/problem+json:
               schema:
@@ -429,7 +477,12 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: A repeated key returns the stored response of the first call.
+      description: >-
+        Client-generated UUID per logical submit (1 to 128 printable ASCII
+        characters); a retry reuses it. The same key with the same request
+        (method, path, body) replays the stored answer with
+        Idempotency-Replayed: true; the same key with another request is 409
+        idempotency-key-reused. Missing is 400 idempotency-key-required.
       schema:
         type: string
         minLength: 1
@@ -446,6 +499,29 @@ components:
       required: true
       schema:
         type: string
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size, 1 to 500 (default 100). Anything else is 400 invalid-limit.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque token copied from the previous page's nextCursor; absent on the first page. One that does not decode is 400 invalid-cursor.
+      schema:
+        type: string
+  headers:
+    IdempotencyReplayed:
+      description: '"true" when the answer is the stored response of an earlier request with the same Idempotency-Key; absent on the first execution.'
+      schema:
+        type: string
+        enum: ['true']
   responses:
     NotFound:
       description: not-found.
@@ -455,6 +531,18 @@ components:
             $ref: '#/components/schemas/Problem'
     Unprocessable:
       description: validation-failed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyKeyProblem:
+      description: idempotency-key-required (no Idempotency-Key header), idempotency-key-invalid (not 1 to 128 printable ASCII characters) or malformed-request.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+    IdempotencyKeyReused:
+      description: idempotency-key-reused (the Idempotency-Key was already used with a different request).
       content:
         application/problem+json:
           schema:
@@ -657,11 +745,15 @@ components:
         version:
           type: integer
           minimum: 1
-    CartList:
+    CartPage:
       type: object
-      required: [carts]
+      description: One page of carts. nextCursor is absent on the last page.
+      required: [items]
       properties:
-        carts:
+        items:
           type: array
           items:
             $ref: '#/components/schemas/Cart'
+        nextCursor:
+          type: string
+          description: Opaque cursor of the next page; pass it back as the cursor query parameter.

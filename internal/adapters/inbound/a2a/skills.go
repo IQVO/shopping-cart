@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 
+	"github.com/IQVO/shopping-cart/internal/application/pagination"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
 	"github.com/IQVO/shopping-cart/internal/domain/shared"
@@ -32,6 +33,14 @@ const (
 // maxCartIDLength mirrors the REST adapter's bound on a path identifier: a
 // longer cartId cannot name a cart, so it is answered 404 like REST does.
 const maxCartIDLength = 128
+
+// The list_shopper_carts skill returns the whole list, not one page: it follows
+// the keyset pages of ListCarts, skillPageSize carts at a time, up to
+// maxSkillCarts carts (the newest ones; documented on the Agent Card).
+const (
+	skillPageSize = 100
+	maxSkillCarts = 1000
+)
 
 // skillRequest is the wire contract of every skill call: the first message
 // part carries (as a Data part, or a Text part holding the same JSON) the skill
@@ -207,15 +216,33 @@ func (d Deps) listShopperCarts(ctx context.Context, rawArgs json.RawMessage) (sk
 	if state != "" && !state.Valid() {
 		return skillResult{}, problemValidation(shared.Invalid("state must be OPEN, CHECKED_OUT, ABANDONED or MERGED"))
 	}
-	carts, err := d.ListCarts.Execute(ctx, args.ShopperID, state)
+	list, err := d.allShopperCarts(ctx, args.ShopperID, state)
 	if err != nil {
 		return skillResult{}, problemFromUseCase(ctx, skillListShopperCarts, err, "")
 	}
-	list := cartListDTO{Carts: make([]cartDTO, len(carts))}
-	for i, v := range carts {
-		list.Carts[i] = cartOut(v)
-	}
 	return skillResult{data: skillDTO{Carts: &list}, summary: summarizeCarts(list)}, nil
+}
+
+// allShopperCarts follows the keyset pages of the ListCarts use case (the ones
+// GET /carts serves a page at a time) until the last page, so the skill answers
+// the complete list, newest first, up to maxSkillCarts carts.
+func (d Deps) allShopperCarts(ctx context.Context, shopperID string, state cart.State) (cartListDTO, error) {
+	list := cartListDTO{Carts: []cartDTO{}}
+	var after *pagination.Keyset
+	for len(list.Carts) < maxSkillCarts {
+		res, err := d.ListCarts.Execute(ctx, shopperID, state, after, skillPageSize)
+		if err != nil {
+			return cartListDTO{}, err
+		}
+		for _, v := range res.Items {
+			list.Carts = append(list.Carts, cartOut(v))
+		}
+		if res.Next == nil {
+			break
+		}
+		after = res.Next
+	}
+	return list, nil
 }
 
 // problemFromUseCase maps a use case error to a problem answer with the SAME

@@ -53,7 +53,7 @@ func requireKeys(t *testing.T, s spec, schema string, got map[string]any) {
 
 func TestTheSpecCopyDeclaresTheRouteWeCall(t *testing.T) {
 	s := loadSpec(t)
-	if op := s.Paths["/delivery-offers:quote"]["post"].OperationID; op != "quoteDeliveryOffers" {
+	if op := s.Paths["/delivery-quotes"]["post"].OperationID; op != "quoteDeliveryOffers" {
 		t.Fatalf("operationId = %q", op)
 	}
 }

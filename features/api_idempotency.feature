@@ -1,8 +1,8 @@
-Feature: Every write takes an Idempotency-Key
+Feature: Every POST takes an Idempotency-Key
   The first answer below 500 is stored for 24 hours: the same key and request
   replays it, the same key with another request is refused.
 
-  Scenario: A write without a key is refused
+  Scenario: A POST without a key is refused
     When I POST "/carts" without a key and body {}
     Then the API answers 400
     And the problem type is "idempotency-key-required"
@@ -17,7 +17,7 @@ Feature: Every write takes an Idempotency-Key
   Scenario: The same key with another request is refused
     When I POST "/carts" with key "k1" and body {"shopperId":"shopper-1"}
     And I POST "/carts" with key "k1" and body {"shopperId":"shopper-2"}
-    Then the API answers 422
+    Then the API answers 409
     And the problem type is "idempotency-key-reused"
 
   Scenario: A malformed body is a problem document
