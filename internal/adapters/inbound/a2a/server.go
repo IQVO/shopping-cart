@@ -37,6 +37,9 @@ import (
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 )
 
+// mediaTypeJSON is the JSON media type the card's input/output modes use.
+const mediaTypeJSON = "application/json"
+
 // Config carries the deployment-specific identity of this agent: the absolute
 // URL clients use to reach its JSON-RPC endpoint (advertised on the Agent
 // Card) and the card version. It is supplied by the composition root from
@@ -74,8 +77,8 @@ func Card(cfg Config) *a2a.AgentCard {
 		SupportedInterfaces: []*a2a.AgentInterface{
 			a2a.NewAgentInterface(cfg.AgentURL, a2a.TransportProtocolJSONRPC),
 		},
-		DefaultInputModes:  []string{"application/json", "text/plain"},
-		DefaultOutputModes: []string{"application/json", "text/plain"},
+		DefaultInputModes:  []string{mediaTypeJSON, "text/plain"},
+		DefaultOutputModes: []string{mediaTypeJSON, "text/plain"},
 		Capabilities:       a2a.AgentCapabilities{Streaming: false},
 		Skills: []a2a.AgentSkill{
 			{
@@ -83,7 +86,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				Name:        "Look up one cart",
 				Description: "Read one cart by its cartId: lines, destinationPostalPrefix, deliveryQuote, selections, the labelled estimate (minor units, estimateComplete says whether every line is priced) and checkoutReadiness. The same document GET /carts/{cartId} returns, for a cart of any state. Answers a 404 problem when no cart has that id. Persists nothing.",
 				Tags:        []string{"cart", "read"},
-				InputModes:  []string{"application/json"},
+				InputModes:  []string{mediaTypeJSON},
 				Examples: []string{
 					`{"skill":"get_cart","arguments":{"cartId":"cart-123"}}`,
 				},
@@ -93,7 +96,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				Name:        "List a shopper's carts",
 				Description: "Read the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. The same answer as GET /carts?shopperId=&state= with every page followed (up to 1000 carts, the newest). A shopper with no carts gets an empty list, not a problem. Persists nothing.",
 				Tags:        []string{"cart", "shopper", "read"},
-				InputModes:  []string{"application/json"},
+				InputModes:  []string{mediaTypeJSON},
 				Examples: []string{
 					`{"skill":"list_shopper_carts","arguments":{"shopperId":"shopper-42"}}`,
 					`{"skill":"list_shopper_carts","arguments":{"shopperId":"shopper-42","state":"OPEN"}}`,

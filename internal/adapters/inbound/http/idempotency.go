@@ -25,10 +25,12 @@ const ReplayedHeader = "Idempotency-Replayed"
 const maxKeyLength = 128
 
 // RequireIdempotencyKey is the Idempotency-Key middleware of every POST route
-// (REST guideline 2), one instance per route name; PUT and DELETE are
-// idempotent by method and are not wrapped. The key is 1 to 128 printable ASCII
-// characters: absent is 400 idempotency-key-required, malformed is 400
-// idempotency-key-invalid.
+// (REST guideline 2); PUT and DELETE are idempotent by method and are not
+// wrapped. A key is global across routes, not scoped to one route name: the
+// fingerprint below carries the path, so reusing a key on another route (or
+// with any other request) is 409 idempotency-key-reused. The key is 1 to 128
+// printable ASCII characters: absent is 400 idempotency-key-required,
+// malformed is 400 idempotency-key-invalid.
 //
 // The request fingerprint is the method, the path and the SHA-256 of the body.
 // The store runs the handler inside the transaction that claims the key, so the
