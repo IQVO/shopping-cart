@@ -3,6 +3,7 @@ package deliverypromise_test
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -17,6 +18,9 @@ type spec struct {
 	} `yaml:"components"`
 	Paths map[string]map[string]struct {
 		OperationID string `yaml:"operationId"`
+		Parameters  []struct {
+			Ref string `yaml:"$ref"`
+		} `yaml:"parameters"`
 	} `yaml:"paths"`
 }
 
@@ -56,6 +60,38 @@ func TestTheSpecCopyDeclaresTheRouteWeCall(t *testing.T) {
 	if op := s.Paths["/delivery-quotes"]["post"].OperationID; op != "quoteDeliveryOffers" {
 		t.Fatalf("operationId = %q", op)
 	}
+}
+
+// The gateway refuses to send a keyless POST (fleet REST guideline); that is only
+// right while the contract still requires the header on this route.
+func TestTheSpecCopyRequiresTheIdempotencyKeyOnTheQuoteRoute(t *testing.T) {
+	var raw struct {
+		Components struct {
+			Parameters map[string]struct {
+				Name     string `yaml:"name"`
+				In       string `yaml:"in"`
+				Required bool   `yaml:"required"`
+			} `yaml:"parameters"`
+		} `yaml:"components"`
+	}
+	data, err := os.ReadFile("testdata/delivery-promise.openapi.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range loadSpec(t).Paths["/delivery-quotes"]["post"].Parameters {
+		const prefix = "#/components/parameters/"
+		def, ok := raw.Components.Parameters[strings.TrimPrefix(p.Ref, prefix)]
+		if ok && def.Name == "Idempotency-Key" && def.In == "header" {
+			if !def.Required {
+				t.Fatal("the quote route no longer requires the Idempotency-Key header")
+			}
+			return
+		}
+	}
+	t.Fatal("the quote route does not declare the Idempotency-Key header")
 }
 
 // The gateway reads window.timeZone (ADR 0007); the contract must declare it
