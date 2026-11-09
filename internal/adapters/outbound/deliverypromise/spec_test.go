@@ -16,12 +16,38 @@ type spec struct {
 			Properties map[string]any `yaml:"properties"`
 		} `yaml:"schemas"`
 	} `yaml:"components"`
-	Paths map[string]map[string]struct {
-		OperationID string `yaml:"operationId"`
-		Parameters  []struct {
-			Ref string `yaml:"$ref"`
-		} `yaml:"parameters"`
-	} `yaml:"paths"`
+	Paths map[string]pathItem `yaml:"paths"`
+}
+
+type operation struct {
+	OperationID string `yaml:"operationId"`
+	Parameters  []struct {
+		Ref string `yaml:"$ref"`
+	} `yaml:"parameters"`
+}
+
+// pathItem keeps only the HTTP-method operations of a path. A path item may also
+// carry `servers` or `parameters` lists (the producer's /reports paths do), which
+// are not operations.
+type pathItem map[string]operation
+
+func (p *pathItem) UnmarshalYAML(n *yaml.Node) error {
+	var raw map[string]yaml.Node
+	if err := n.Decode(&raw); err != nil {
+		return err
+	}
+	*p = pathItem{}
+	for key, node := range raw {
+		switch key {
+		case "get", "put", "post", "delete", "patch", "head", "options", "trace":
+			var op operation
+			if err := node.Decode(&op); err != nil {
+				return err
+			}
+			(*p)[key] = op
+		}
+	}
+	return nil
 }
 
 func loadSpec(t *testing.T) spec {
