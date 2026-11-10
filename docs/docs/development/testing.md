@@ -95,11 +95,14 @@ Documentation site, from `docs/`: `npm ci`, `npx tsc --noEmit -p .`,
 | `integration` | `go test -tags=integration ./... -race -count=1` | yes |
 | `mutation-fast` | gremlins on every `internal/domain/*/` package | yes |
 | `mutation` | gremlins on `./internal/domain`; schedule or manual only; opens or closes a `harness:red` issue on a scheduled failure | schedule |
+| `drift` | `deadcode -test ./...`, `go mod tidy -diff` and `scripts/coverage-quality.py` (high-coverage functions with a surviving mutant) written to the job summary; `harness:red` issue on a scheduled failure | no (advisory, schedule and dispatch only) |
 | `api-lint` | Spectral on `apis/openapi.yaml` and `apis/asyncapi.yaml` with `--fail-severity=warn` | yes |
 | `vuln` | `govulncheck ./...` | yes |
+| `docs-api-drift` | `npm ci`, `npm run clean-api-docs` and `npm run gen-api-docs` in `docs/`, then fails when `docs/docs/api-reference/rest` differs from what is committed | yes |
 | `helm-lint` | `ct lint` and `helm lint` with both `ci/*-values.yaml`; pull requests only | yes |
 | `chart-tests` | every `charts/shopping-cart/tests/*.sh` and `test_*.py`; a printed `SKIP` fails the job | yes |
 | `arch-test` | `go test ./internal/architecture/... -v` | yes |
+| `trivy-scan` | builds the image locally (not pushed), uploads a Trivy SARIF report (CRITICAL/HIGH/MEDIUM) and fails on a CRITICAL or HIGH OS/library finding that has a fix | yes, pull requests only |
 | `docker-publish` | builds and pushes `ghcr.io/iqvo/shopping-cart`, signs with cosign, attaches an SBOM; push to `main` after the gates above | main only |
 | `release` | tags `vX.Y.Z`, retags the image, packages and pushes the Helm chart to `oci://ghcr.io/iqvo`, creates the GitHub release | main only |
 

@@ -34,6 +34,9 @@ three regulation categories: **maintainability**, **architecture fitness**,
 |---|---|---|---|---|---|
 | `make fmt-check` / `lefthook pre-commit` | maintainability | computational | pre-commit | yes (local) | seconds |
 | `lint` (golangci-lint) | maintainability | computational | pre-commit, PR | yes | seconds |
+| `guide-lint` (`scripts/harness/guide_lint.py`, `test_hook.py`) | maintainability | computational | PR | no (advisory, `continue-on-error`) | seconds |
+| `complexity` (gocyclo, gocognit, cyclop, funlen, nestif) | maintainability | computational | PR | yes | seconds |
+| `file-length` (revive file-length-limit) | maintainability | computational | PR | yes (touched files) | seconds |
 | `test` (`go test -race`) | maintainability | computational | pre-commit (fast subset), PR | yes | seconds–minutes |
 | `coverage` (90% gate) | maintainability | computational | pre-push, PR | yes | minutes |
 | `bdd` (godog/Gherkin) | behaviour | computational | pre-push, PR | yes | seconds |
@@ -43,13 +46,13 @@ three regulation categories: **maintainability**, **architecture fitness**,
 | `mutation` (gremlins, full domain) | maintainability | computational | weekly schedule | no (advisory report) | tens of minutes |
 | `vuln` (govulncheck) | maintainability | computational | PR | yes | seconds |
 | `api-lint` (Spectral) | maintainability | computational | PR | yes | seconds |
+| `pinned-contracts` (`scripts/harness/pinned_contract_gate.py`) | behaviour | computational | PR | yes | seconds |
 | `docs-api-drift` | maintainability | computational | PR | yes | seconds |
-| `web` (vitest/tsc/eslint) | maintainability | computational | PR | yes | minutes |
-| `helm-lint` | maintainability | computational | PR (targeting main) | yes | seconds |
-| `trivy-scan` | maintainability | computational | PR (targeting main) | yes (CRITICAL/HIGH w/ fix) | minutes |
+| `helm-lint` | maintainability | computational | PR | yes | seconds |
+| `chart-tests` (chart render/selector tests) | maintainability | computational | PR | yes | seconds |
+| `trivy-scan` | maintainability | computational | PR | yes (CRITICAL/HIGH w/ fix) | minutes |
 | `CodeQL` | maintainability | computational | PR, schedule | yes (conversation-resolution) | minutes |
-| `Scorecard` | maintainability | computational | schedule | no | minutes |
-| `drift` (deadcode, `go mod tidy -diff`, knip, coverage-quality) | maintainability | computational | weekly schedule | **no — advisory** | minutes |
+| `drift` (deadcode, `go mod tidy -diff`, coverage-quality; no knip: there is no `web/`) | maintainability | computational | weekly schedule | **no — advisory** | minutes |
 | `/code-review`, `/architecture-review`, `/domain-review` | architecture fitness / behaviour | **inferential** | invoked by hand (local-only, per user decision 2026-09-13) | no | LLM cost per invocation |
 
 **New sensors default to advisory for ~2 weeks, then auto-promote to
