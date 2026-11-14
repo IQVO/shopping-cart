@@ -30,7 +30,7 @@ flowchart LR
     CK ==>|"U to D: C/S, SC is Customer<br/>Kafka CheckoutCompleted"| SC
     PR ==>|"U to D: C/S, SC is Customer<br/>Kafka ItemPriceChanged,<br/>ItemPriceWithdrawn,<br/>DeliveryChargeScheduleChanged,<br/>TaxTableChanged"| SC
     OA ==>|"U to D: CF<br/>Kafka CatalogItemCreated,<br/>CatalogItemDiscontinued"| SC
-    SC -.->|"D to U: C/S through the OHS<br/>REST POST /delivery-offers:quote<br/>QuoteDeliveryOffers"| DP
+    SC -.->|"D to U: C/S through the OHS<br/>REST POST /delivery-quotes<br/>QuoteDeliveryOffers"| DP
     SC ==>|"U to D, analytics only<br/>Kafka CartLineAdded,<br/>CartDeliveryQuoted, CartAbandoned,<br/>CartCheckedOut"| AN
 ```
 
@@ -62,11 +62,11 @@ calls `customer-ordering` (reaching it is checkout's job) and never touches a
 | --- | --- | --- | --- | --- | --- |
 | `storefront-bff` (experience layer) | cart upstream, BFF downstream | **UI** | REST `/carts` writes, `GET /carts/{cartId}`, `GET /carts?shopperId=&state=` | `CreateCart`, `AddLine`, `SetLineQuantity`, `RemoveLine`, `SetDestination`, `QuoteDelivery`, `SelectDelivery`, `MergeInto`; `GetCart`, `ListCarts` | The BFF is the only storefront edge; it mints the `Idempotency-Key` and keeps cart ids in a cookie. The cart is the system of record for the intent. |
 | `checkout` (Supporting) | cart upstream, checkout downstream | **Customer/Supplier** (checkout is the Customer) | REST `GET /carts/{cartId}` | `GetCart` | Checkout reads cart and version plus `checkoutReadiness` inside the shopper's session-open request. |
-| `checkout` (Supporting) | cart upstream, checkout downstream | **Customer/Supplier** (checkout is the Customer) | REST `POST /carts/{cartId}/delivery/requoted` | `AcceptRequotedOffers` | The route exists for checkout's requote; no caller was found in the local checkouts. |
+| `checkout` (Supporting) | cart upstream, checkout downstream | **Customer/Supplier** (checkout is the Customer) | REST `POST /carts/{cartId}/delivery-requote-acceptances` | `AcceptRequotedOffers` | The route exists for checkout's requote; no caller was found in the local checkouts. |
 | `checkout` (Supporting) | checkout upstream, cart downstream | **Customer/Supplier** (SC is the Customer) | Kafka `retailnetwork.checkout.events` | `CheckoutCompleted` | The cart closes itself (`CloseOnCheckoutCompleted`) on the fact, instead of checkout calling back synchronously. |
 | `pricing` (Core) | pricing upstream, SC downstream | **Customer/Supplier** (SC is the Customer) | Kafka `retailnetwork.pricing.events` | `ItemPriceChanged`, `ItemPriceWithdrawn`, `DeliveryChargeScheduleChanged`, `TaxTableChanged` | The estimate's inputs come by event so the cart never blocks on a synchronous price read. |
 | `offer-availability` (network, Supporting) | OA upstream, SC downstream | **Conformist** | Kafka `retailnetwork.offer-availability.events` | `CatalogItemCreated`, `CatalogItemDiscontinued` | The catalogue facts are taken as published into the purchasability view; the cart never redefines the item. |
-| `delivery-promise` (network, Core) | DP upstream, SC downstream | **Open Host Service** (network side) with a conformist consumer | REST `POST /delivery-offers:quote` | `QuoteDeliveryOffers` (query) | The network publishes the route; the cart consumes the offer set as returned (windows, tiers, expiries, unavailable tiers) and adds nothing. |
+| `delivery-promise` (network, Core) | DP upstream, SC downstream | **Open Host Service** (network side) with a conformist consumer | REST `POST /delivery-quotes` | `QuoteDeliveryOffers` (query) | The network publishes the route; the cart consumes the offer set as returned (windows, tiers, expiries, unavailable tiers) and adds nothing. |
 | agents | cart upstream, agents downstream | **Open Host Service** | A2A JSON-RPC on `cmd/a2a` | `get_cart`, `list_shopper_carts` | Read-only delegation channel, ADR 0006. |
 | analytics consumers | cart upstream, analytics downstream | analytics stream | Kafka `retailnetwork.shopping-cart.analytics` | `CartLineAdded`, `CartDeliveryQuoted`, `CartAbandoned`, `CartCheckedOut` | Funnel facts only; no storefront or network context consumes a cart event today. |
 

@@ -20,7 +20,7 @@ sides) and never touches a `warehouse.*` topic. The context map is on
 
 | Neighbour | Direction | Protocol | Contract | Failure behaviour |
 | --- | --- | --- | --- | --- |
-| `delivery-promise` (network, Core) | cart calls it | REST `POST /delivery-offers:quote` | the network's Open Host Service route; the cart restates the one route and its DTOs in `internal/adapters/outbound/deliverypromise` | timeout, transport error, 5xx or undecodable answer: `503` `delivery-promise-unavailable`; 4xx: reported the same way (a contract bug); nothing is stored, retry with the same `Idempotency-Key` |
+| `delivery-promise` (network, Core) | cart calls it | REST `POST /delivery-quotes` | the network's Open Host Service route; the cart restates the one route and its DTOs in `internal/adapters/outbound/deliverypromise` | timeout, transport error, 5xx or undecodable answer: `503` `delivery-promise-unavailable`; 4xx: reported the same way (a contract bug); nothing is stored, retry with the same `Idempotency-Key` |
 | `offer-availability` (network, Supporting) | it publishes, cart consumes | Kafka `retailnetwork.offer-availability.events` | `CatalogItemCreated`, `CatalogItemDiscontinued` | retry, then dead letter; a conformist consumer |
 | `pricing` (Core) | it publishes, cart consumes | Kafka `retailnetwork.pricing.events` | `ItemPriceChanged`, `ItemPriceWithdrawn`, `DeliveryChargeScheduleChanged`, `TaxTableChanged` | retry, then dead letter; version-guarded, stale events ignored |
 | `checkout` (Supporting) | it publishes, cart consumes | Kafka `retailnetwork.checkout.events` | `CheckoutCompleted` | retry, then dead letter; an unknown or closed cart is acknowledged and logged |
@@ -38,7 +38,7 @@ security scheme. Every Kafka message is CloudEvents 1.0 in structured mode
 
 - **When:** only in `QuoteDelivery`. Every other use case works with nothing
   listening there.
-- **Call:** `POST {DELIVERY_PROMISE_URL}/delivery-offers:quote` with
+- **Call:** `POST {DELIVERY_PROMISE_URL}/delivery-quotes` with
   `{"destinationPostalPrefix": "...", "lines": [{"catalogItemId", "quantity"}]}`,
   `Content-Type: application/json`, and the `Idempotency-Key` of the cart request
   forwarded, so a repeat inside the offers' TTL returns the same offers. The
@@ -109,7 +109,7 @@ answer below 500 is stored 24 hours and replayed. Checkout reads
 (every group selected, no offer expired); the shopper's calls come through
 `storefront-bff`. The route list is on [API reference](/docs/api-reference).
 
-`POST /carts/{cartId}/delivery/requoted` is the route checkout is meant to use
+`POST /carts/{cartId}/delivery-requote-acceptances` is the route checkout is meant to use
 when its own requote replaces the offers. No caller of it was found in the local
 checkouts of `checkout` and `storefront-bff`, so today it is served and tested but
 unused by a sibling.

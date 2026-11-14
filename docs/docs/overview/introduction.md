@@ -70,13 +70,13 @@ alert rules for it ([Observability](/docs/operations/observability)).
 ## Main capabilities
 
 1. Create a cart (guest or for a shopper), add, re-quantify and remove lines, set
-   the destination prefix (`POST /carts`, `/carts/{cartId}/lines`, `:set-quantity`,
-   `:remove`, `:set-destination`).
-2. Quote delivery through delivery-promise (`:quote-delivery`), the cart's only
-   synchronous call, and select one offer per shipment group (`:select-delivery`).
-3. Merge a guest cart into a shopper's open cart at sign-in (`:merge-into`) and
+   the destination prefix (`POST /carts`, `POST /carts/{cartId}/lines`, `PUT` and `DELETE`
+   `/carts/{cartId}/lines/{catalogItemId}`, `PUT /carts/{cartId}/destination`).
+2. Quote delivery through delivery-promise (`POST /carts/{cartId}/delivery-quotes`), the cart's only
+   synchronous call, and select one offer per shipment group (`PUT /carts/{cartId}/delivery-selection`).
+3. Merge a guest cart into a shopper's open cart at sign-in (`POST /carts/{cartId}/merges`) and
    accept the offers of a checkout requote without a call to delivery-promise
-   (`/carts/{cartId}/delivery/requoted`).
+   (`POST /carts/{cartId}/delivery-requote-acceptances`).
 4. Read a cart with its quote, selections, estimate and checkout readiness
    (`GET /carts/{cartId}`), or a shopper's carts (`GET /carts?shopperId=&state=`);
    the same two reads are served to agents as the A2A skills `get_cart` and
