@@ -43,7 +43,8 @@ All are in `internal/architecture` and run with `make arch-test`:
 | `TestEventCatalogueMatchesContract` | every type `apis/asyncapi.yaml` declares is listed in the CloudEvents ADR |
 | `TestPostgresIntegrationTestsUseTestcontainers`, `TestKafkaIntegrationTestsUseTestcontainers` | integration tests boot their own containers, with no skip gate |
 | `TestNoGoFilesAtRepoRoot` | no Go file at the repository root |
-| `TestMCPAdapterDependencyRule`, `TestMCPOptionalToolInputsCarryOmitempty` | template sensors about an MCP adapter; this repository has no `cmd/mcp` |
+| `TestMCPAdapterDependencyRule`, `TestMCPOptionalToolInputsCarryOmitempty` | the MCP adapter (`cmd/mcp`, ADR 0009) imports only the application and domain layers, and an optional tool input carries `omitempty` |
+| `TestEveryMCPToolDeclaresAuthority`, `TestMCPWriteToolsAreAtLeastL3`, `TestA2ASkillsDeclareAuthority`, `TestMCPServerOffersResourceAndPrompt` and their `...SensorBites` companions | every MCP tool and A2A skill declares an authority level, a write tool is at least L3, and the MCP surface has a resource and a prompt |
 
 Each sensor that scans source has a companion test (`...SensorBites`,
 `...FailsOnBadFixtures`) proving it fails on a bad fixture.

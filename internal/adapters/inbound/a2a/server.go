@@ -11,10 +11,10 @@
 // data-sync channel: facts between contexts still travel exclusively as
 // CloudEvents on Kafka, published through the transactional outbox (ADR 0004).
 //
-// This agent is READ-ONLY. shopping-cart has no MCP surface to derive skills
-// from, so the two skills mirror the two REST GETs (GET /carts/{cartId} and GET
-// /carts?shopperId=&state=) and expose exactly what those expose: the cart
-// wire shape of apis/openapi.yaml and nothing REST withholds. A cart is
+// This agent is READ-ONLY. The two skills mirror the two REST GETs (GET
+// /carts/{cartId} and GET /carts?shopperId=&state=), exactly like the two read
+// tools of the MCP server (ADR 0009), and expose exactly what those expose and
+// nothing REST withholds. A cart is
 // customer data (a shopperId reference, quantities, a delivery postal prefix),
 // so the surface never widens past the REST GETs. This package never writes,
 // never publishes an event, never calls another bounded context and contains
@@ -85,7 +85,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillGetCart,
 				Name:        "Look up one cart",
 				Description: "Read one cart by its cartId: lines, destinationPostalPrefix, deliveryQuote, selections, the labelled estimate (minor units, estimateComplete says whether every line is priced) and checkoutReadiness. The same document GET /carts/{cartId} returns, for a cart of any state. Answers a 404 problem when no cart has that id. Persists nothing.",
-				Tags:        []string{"cart", "read"},
+				Tags:        []string{"cart", "read", "authority:L1"},
 				InputModes:  []string{mediaTypeJSON},
 				Examples: []string{
 					`{"skill":"get_cart","arguments":{"cartId":"cart-123"}}`,
@@ -95,7 +95,7 @@ func Card(cfg Config) *a2a.AgentCard {
 				ID:          skillListShopperCarts,
 				Name:        "List a shopper's carts",
 				Description: "Read the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. The same answer as GET /carts?shopperId=&state= with every page followed (up to 1000 carts, the newest). A shopper with no carts gets an empty list, not a problem. Persists nothing.",
-				Tags:        []string{"cart", "shopper", "read"},
+				Tags:        []string{"cart", "shopper", "read", "authority:L1"},
 				InputModes:  []string{mediaTypeJSON},
 				Examples: []string{
 					`{"skill":"list_shopper_carts","arguments":{"shopperId":"shopper-42"}}`,

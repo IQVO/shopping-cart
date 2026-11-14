@@ -187,6 +187,49 @@ readinessProbe:
   initialDelaySeconds: 3
   periodSeconds: 5
 
+# The read-only MCP server (cmd/mcp, ADR 0009): a driving adapter over the SAME
+# read use cases as GET /carts/{cartId} and GET /carts, serving the two read tools
+# get_cart and list_shopper_carts (all authority L1), one resource and one prompt
+# over Streamable HTTP. READ-ONLY: it writes nothing, so it needs no Kafka, no
+# outbox, no consumers and no delivery-promise, it exposes exactly what the REST
+# GETs expose, and it calls no other context. It reads the same Postgres as the
+# api (database.* above). Off by default; warehouse-infra turns it on. No auth of
+# any kind (fleet-wide revert): access control is the in-cluster ClusterIP boundary.
+mcp:
+  enabled: false
+  replicaCount: 1
+  # MCP_ADDR the binary listens on; its port must equal mcp.service.targetPort.
+  # (8080 is the api and 8093 the a2a agent, so 8090 like the rest of the fleet's
+  # MCP servers.)
+  httpAddr: ":8090"
+  service:
+    type: ClusterIP
+    port: 8090
+    targetPort: 8090
+  # Gateway exposure of the MCP server (mcp-route.yaml): host path
+  # /api/mcp/shopping-cart rewritten to /mcp (the SDK's canonical endpoint on
+  # cmd/mcp). Off by default; warehouse-infra turns it on with the real
+  # parentRefs. No auth plugin anywhere.
+  route:
+    enabled: false
+    path: "/api/mcp/shopping-cart"
+    parentRefs:
+      - name: ""
+        namespace: ""
+        sectionName: "http"
+  # Extra environment for the MCP container only. The chart refuses a *_MODE
+  # variable, anything that belongs to the write or event side (Kafka, the
+  # delivery-promise client, the consumer groups, the relay, the sweeps) and
+  # anything the chart renders itself; none of those exists in cmd/mcp.
+  extraEnv: []
+  resources:
+    limits:
+      cpu: 500m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
 # A2A (Agent2Agent) agent (cmd/a2a, ADR 0006): a second driving adapter over the
 # SAME read use cases as GET /carts/{cartId} and GET /carts. Skills (both reads):
 # get_cart and list_shopper_carts. READ-ONLY: it writes nothing, so it needs no

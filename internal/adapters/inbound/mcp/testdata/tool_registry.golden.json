@@ -1,0 +1,585 @@
+[
+  {
+    "_meta": {
+      "com.warehouse/authority": "L1"
+    },
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "Read one cart by its cartId: the lines (catalog item and quantity), the destinationPostalPrefix, the deliveryQuote (offer groups and unavailable tiers), the shopper's selections, the labelled estimate in minor units (estimateComplete says whether every line is priced; it is a non-binding estimate) and checkoutReadiness. The same document GET /carts/{cartId} returns, for a cart of any state. shopperId is null for a guest cart. Read-only; an unknown cartId fails with not-found, a blank one with validation-failed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cartId": {
+          "description": "the cart id, e.g. cart-123",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cartId"
+      ],
+      "type": "object"
+    },
+    "name": "get_cart",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cartId": {
+          "type": "string"
+        },
+        "checkoutReadiness": {
+          "additionalProperties": false,
+          "properties": {
+            "allGroupsSelected": {
+              "type": "boolean"
+            },
+            "noOfferExpired": {
+              "type": "boolean"
+            },
+            "ready": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "ready",
+            "allGroupsSelected",
+            "noOfferExpired"
+          ],
+          "type": "object"
+        },
+        "deliveryQuote": {
+          "additionalProperties": false,
+          "properties": {
+            "groups": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "groupNo": {
+                    "type": "integer"
+                  },
+                  "lineNos": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "offers": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "deliverByEarliest": {
+                          "type": "string"
+                        },
+                        "deliverByLatest": {
+                          "type": "string"
+                        },
+                        "expiresAt": {
+                          "type": "string"
+                        },
+                        "groupNo": {
+                          "type": "integer"
+                        },
+                        "offerId": {
+                          "type": "string"
+                        },
+                        "tier": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "offerId",
+                        "groupNo",
+                        "tier",
+                        "deliverByEarliest",
+                        "deliverByLatest",
+                        "expiresAt"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  }
+                },
+                "required": [
+                  "groupNo",
+                  "lineNos",
+                  "offers"
+                ],
+                "type": "object"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "quotedAt": {
+              "type": "string"
+            },
+            "unavailable": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "constraint": {
+                    "type": "string"
+                  },
+                  "groupNo": {
+                    "type": "integer"
+                  },
+                  "tier": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "tier",
+                  "constraint"
+                ],
+                "type": "object"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "unavailableTiers": {
+              "items": {
+                "type": "string"
+              },
+              "type": [
+                "null",
+                "array"
+              ]
+            }
+          },
+          "required": [
+            "groups",
+            "unavailableTiers",
+            "unavailable",
+            "quotedAt"
+          ],
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "destinationPostalPrefix": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "estimate": {
+          "additionalProperties": false,
+          "properties": {
+            "currency": {
+              "type": "string"
+            },
+            "deliveryMinor": {
+              "type": "integer"
+            },
+            "estimateComplete": {
+              "type": "boolean"
+            },
+            "itemsMinor": {
+              "type": "integer"
+            },
+            "taxMinor": {
+              "type": "integer"
+            },
+            "totalMinor": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "currency",
+            "itemsMinor",
+            "deliveryMinor",
+            "taxMinor",
+            "totalMinor",
+            "estimateComplete"
+          ],
+          "type": "object"
+        },
+        "lines": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "catalogItemId": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "catalogItemId",
+              "quantity"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "selections": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "groupNo": {
+                "type": "integer"
+              },
+              "offerId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "groupNo",
+              "offerId"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "shopperId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "version": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cartId",
+        "shopperId",
+        "state",
+        "lines",
+        "destinationPostalPrefix",
+        "selections",
+        "estimate",
+        "checkoutReadiness",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  {
+    "_meta": {
+      "com.warehouse/authority": "L1"
+    },
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": false,
+      "readOnlyHint": true
+    },
+    "description": "List the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. Answers ONE page of at most limit carts (1 to 100, default 20) and hasMore says an older cart exists; narrow with state to reach it. A shopper with no carts gets an empty list, not an error. Read-only; a missing or invalid shopperId, an unknown state or a limit out of range fails with validation-failed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "description": "optional page size from 1 to 100; omitted means 20",
+          "type": "integer"
+        },
+        "shopperId": {
+          "description": "the shopper id whose carts are listed, e.g. shopper-42",
+          "type": "string"
+        },
+        "state": {
+          "description": "optional state filter: OPEN, CHECKED_OUT, ABANDONED or MERGED; omitted means every state",
+          "type": "string"
+        }
+      },
+      "required": [
+        "shopperId"
+      ],
+      "type": "object"
+    },
+    "name": "list_shopper_carts",
+    "outputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "carts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "cartId": {
+                "type": "string"
+              },
+              "checkoutReadiness": {
+                "additionalProperties": false,
+                "properties": {
+                  "allGroupsSelected": {
+                    "type": "boolean"
+                  },
+                  "noOfferExpired": {
+                    "type": "boolean"
+                  },
+                  "ready": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ready",
+                  "allGroupsSelected",
+                  "noOfferExpired"
+                ],
+                "type": "object"
+              },
+              "deliveryQuote": {
+                "additionalProperties": false,
+                "properties": {
+                  "groups": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "groupNo": {
+                          "type": "integer"
+                        },
+                        "lineNos": {
+                          "items": {
+                            "type": "integer"
+                          },
+                          "type": [
+                            "null",
+                            "array"
+                          ]
+                        },
+                        "offers": {
+                          "items": {
+                            "additionalProperties": false,
+                            "properties": {
+                              "deliverByEarliest": {
+                                "type": "string"
+                              },
+                              "deliverByLatest": {
+                                "type": "string"
+                              },
+                              "expiresAt": {
+                                "type": "string"
+                              },
+                              "groupNo": {
+                                "type": "integer"
+                              },
+                              "offerId": {
+                                "type": "string"
+                              },
+                              "tier": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "offerId",
+                              "groupNo",
+                              "tier",
+                              "deliverByEarliest",
+                              "deliverByLatest",
+                              "expiresAt"
+                            ],
+                            "type": "object"
+                          },
+                          "type": [
+                            "null",
+                            "array"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "groupNo",
+                        "lineNos",
+                        "offers"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "quotedAt": {
+                    "type": "string"
+                  },
+                  "unavailable": {
+                    "items": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "constraint": {
+                          "type": "string"
+                        },
+                        "groupNo": {
+                          "type": "integer"
+                        },
+                        "tier": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "tier",
+                        "constraint"
+                      ],
+                      "type": "object"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  },
+                  "unavailableTiers": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": [
+                      "null",
+                      "array"
+                    ]
+                  }
+                },
+                "required": [
+                  "groups",
+                  "unavailableTiers",
+                  "unavailable",
+                  "quotedAt"
+                ],
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "destinationPostalPrefix": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "estimate": {
+                "additionalProperties": false,
+                "properties": {
+                  "currency": {
+                    "type": "string"
+                  },
+                  "deliveryMinor": {
+                    "type": "integer"
+                  },
+                  "estimateComplete": {
+                    "type": "boolean"
+                  },
+                  "itemsMinor": {
+                    "type": "integer"
+                  },
+                  "taxMinor": {
+                    "type": "integer"
+                  },
+                  "totalMinor": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "currency",
+                  "itemsMinor",
+                  "deliveryMinor",
+                  "taxMinor",
+                  "totalMinor",
+                  "estimateComplete"
+                ],
+                "type": "object"
+              },
+              "lines": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "catalogItemId": {
+                      "type": "string"
+                    },
+                    "quantity": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "catalogItemId",
+                    "quantity"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "selections": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "groupNo": {
+                      "type": "integer"
+                    },
+                    "offerId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "groupNo",
+                    "offerId"
+                  ],
+                  "type": "object"
+                },
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "shopperId": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "state": {
+                "type": "string"
+              },
+              "version": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "cartId",
+              "shopperId",
+              "state",
+              "lines",
+              "destinationPostalPrefix",
+              "selections",
+              "estimate",
+              "checkoutReadiness",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "hasMore": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "carts",
+        "hasMore"
+      ],
+      "type": "object"
+    }
+  }
+]

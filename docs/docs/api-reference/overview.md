@@ -23,7 +23,7 @@ the answers.
 | --- | --- | --- |
 | REST | `apis/openapi.yaml` (OpenAPI 3.0.3, version 0.1.0) | The pages under *REST* in the sidebar are generated from the spec with `npm run gen-api-docs`; do not edit them by hand. The spec names `http://localhost:8080`; in the kind cluster the service is behind Kong at `/api/shopping-cart` (prefix stripped). |
 | Events | `apis/asyncapi.yaml` (AsyncAPI 3.0.0, version 1.0.0) | Four published events and seven consumed ones, on the [event catalogue](/docs/api-reference/events); every field on [Domain events](/docs/ddd/domain-events). |
-| MCP | none | There is no `cmd/mcp`. |
+| MCP | [ADR 0009](/docs/adr/0009-read-only-mcp-server), [MCP tools](/docs/mcp/tools), `internal/adapters/inbound/mcp` | `cmd/mcp`, Streamable HTTP on `/mcp` (port 8090; through the gateway `/api/mcp/shopping-cart`, off by default in the chart). Two read-only tools (`get_cart`, `list_shopper_carts`), each authority `L1`, one resource and one prompt; no write tool. No auth, by fleet decision. |
 | A2A | [ADR 0006](/docs/adr/0006-a2a-inbound-adapter), `internal/adapters/inbound/a2a` | `cmd/a2a`, JSON-RPC 2.0 on `/` and `/a2a` (port 8093; through Kong `/api/a2a/shopping-cart`), Agent Card at `/.well-known/agent-card.json`. Two read-only skills, no write skill. No auth, by fleet decision. |
 
 ## Endpoints
@@ -92,7 +92,7 @@ Every cart answer is the same document (`cartBody`,
   group, or no tax band for the prefix).
 - **Concurrency.** A write that loses the version race is retried once, then
   `409` `concurrent-update`.
-- **Auth:** none. REST, A2A and (absent) MCP are unauthenticated fleet-wide;
+- **Auth:** none. REST, A2A and MCP are unauthenticated fleet-wide;
   `TestNoAuthMiddlewareReintroduced` fails CI if auth middleware returns.
 - **Local calendar.** `deliverByEarliest` and `deliverByLatest` are calendar dates
   in the destination's local time zone ([ADR 0007](/docs/adr/0007-delivery-dates-in-the-destinations-local-calendar)).

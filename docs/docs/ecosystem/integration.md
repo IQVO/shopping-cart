@@ -131,6 +131,6 @@ Stated so nobody looks for them:
 | Calls to `customer-ordering`, `customer-payments`, `product-content`, `product-discovery` | reaching the order record is checkout's job; the cart consumes no content events and keeps its own purchasability view |
 | Any `warehouse.*` topic | the cart is a retail-network storefront context, not part of the warehouse |
 | A consumer of the analytics topic | no context consumes cart events yet |
-| MCP | there is no `cmd/mcp` |
+| MCP | read-only only: `cmd/mcp` serves `get_cart` and `list_shopper_carts` ([ADR 0009](/docs/adr/0009-read-only-mcp-server)); no write tool |
 | Authentication | removed fleet-wide; none exists here |
 | A cart-owned webhook, push or websocket | none; callers poll the REST reads |

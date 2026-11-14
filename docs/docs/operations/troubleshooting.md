@@ -113,7 +113,7 @@ Every error is `application/problem+json` with `type` `/problems/<slug>`
 | --- | --- | --- | --- |
 | The Agent Card advertises an unreachable URL | `A2A_AGENT_URL` is what the card says; the default in-cluster Service DNS is wrong off-cluster | `curl .../.well-known/agent-card.json` | Set `a2a.agentUrl` (or `A2A_AGENT_URL`) to the gateway URL |
 | A skill call answers a problem inside a normal reply | Skill errors are answered in-band, not as JSON-RPC errors: `malformed`, unknown skill, `cart not found`, validation. The request must be one data part (or a text part holding the same JSON) with `skill` and `arguments`, and unknown fields are refused | the `problem` of the reply envelope | Send `{"skill":"get_cart","arguments":{"cartId":"..."}}`; see [API reference](/docs/api-reference) |
-| The agent answers but REST shows a different currency | `CART_CURRENCY` differs between the two binaries | both environments | Set the same value on both |
+| The agent answers but REST shows a different currency | `CART_CURRENCY` differs between the binaries | all environments | Set the same value on the api, a2a and mcp |
 | The agent fails to start while REST works | It reads only Postgres; a missing `A2A_AGENT_URL` or `DATABASE_URL` is the usual cause | the boot error | Set both |
 
 ## Telemetry

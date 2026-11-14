@@ -8,12 +8,13 @@ description: "Deploying, probing, migrating and operating Shopping Cart: Helm ch
 # Operations runbook
 
 Shopping Cart owns cart lines, delivery quotes and a labelled cost estimate. It
-ships two deployables from one image family:
+ships three deployables from one image family:
 
 | Binary | Role | Port | Chart component |
 | --- | --- | --- | --- |
 | `cmd/api` | REST, the transactional outbox relay, three Kafka consumers (offer-availability, pricing, checkout) and two clock-driven sweep policies, all in one process | `:8080` | `deployment.yaml`, always on |
 | `cmd/a2a` | Read-only Agent2Agent agent over the same Postgres (`get_cart`, `list_shopper_carts`, ADR 0006) | `:8093` | `a2a-deployment.yaml`, off unless `a2a.enabled=true` |
+| `cmd/mcp` | Read-only MCP server over the same Postgres (tools `get_cart`, `list_shopper_carts`, one resource, one prompt, ADR 0009) | `:8090` | `mcp-deployment.yaml`, off unless `mcp.enabled=true` |
 
 Runtime is real Postgres and real Kafka only. There is no in-memory or
 permissive mode, so a pod that cannot reach either refuses to boot or reports
@@ -80,6 +81,14 @@ the in-cluster Service DNS (`http://<release>-a2a.<ns>.svc.cluster.local:8093/`)
 override it with the gateway URL when the agent must be reachable off-cluster,
 because that URL is what the Agent Card advertises.
 
+To add the MCP server set `--set mcp.enabled=true` (default off). It needs the
+database only: no Kafka, no delivery-promise and no consumer-group value reaches
+it, and `mcp.extraEnv` refuses `*_MODE`, those variables and any variable the
+chart renders itself. `mcp.route.enabled=true` publishes `/api/mcp/shopping-cart`
+(rewritten to `/mcp`) through the Gateway `parentRefs` of the environment; the
+in-cluster endpoint is `http://<release>-mcp.<ns>.svc.cluster.local:8090/mcp`.
+The binary is `/app/mcp` of the same image.
+
 Static chart checks run offline: `charts/shopping-cart/tests/render_test.sh`
 and `charts/shopping-cart/tests/test_service_selectors.py` (see
 [Testing](/docs/development/testing)).
@@ -101,14 +110,14 @@ resume from the committed offsets with no replay storm.
 
 | Endpoint | Binary | Meaning |
 | --- | --- | --- |
-| `GET /healthz` | api and a2a | Liveness only: `{"status":"ok"}` |
+| `GET /healthz` | api, a2a and mcp | Liveness only: `{"status":"ok"}` |
 | `GET /readyz` | api | 200 only while Postgres answers a ping **and** a Kafka broker answers a topic-less metadata request. The verdict is cached 3 s and each check is bounded to 2 s. It flips to 503 first during shutdown |
 
 Probes in the chart: the api `startupProbe` hits `/healthz` every 2 s with a
 failure threshold of 30 (about 60 s, because the migrations and the first ping
 run inside a bounded retry, `internal/bootretry`); `livenessProbe` is
-`/healthz` every 10 s; `readinessProbe` is `/readyz` every 5 s. The a2a
-deployment uses `/healthz` for all three, since it has no Kafka to wait for.
+`/healthz` every 10 s; `readinessProbe` is `/readyz` every 5 s. The a2a and mcp
+deployments use `/healthz` for all three, since they have no Kafka to wait for.
 
 A broker outage therefore makes the pod **not ready but alive**: Kong stops
 routing to it and the consumers and relay keep retrying. The consumers dial
@@ -131,8 +140,8 @@ name in the final log line.
 
 One migration, `0001_shopping_cart_schema`
 (`internal/adapters/outbound/postgres/migrations/`), embedded in the binary and
-applied at boot over `MIGRATIONS_DATABASE_URL`. Both `cmd/api` and `cmd/a2a` run
-it and it is idempotent, so either may start first. When `DATABASE_URL` goes
+applied at boot over `MIGRATIONS_DATABASE_URL`. `cmd/api`, `cmd/a2a` and `cmd/mcp` run
+it and it is idempotent, so any of them may start first. When `DATABASE_URL` goes
 through a transaction-mode pooler keep the direct key populated: the migration
 holds a session-scoped advisory lock and hangs behind a pooler. Migrations and
 the first ping retry with bounded backoff; on exhaustion the last error is
