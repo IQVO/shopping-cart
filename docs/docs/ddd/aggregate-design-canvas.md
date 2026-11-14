@@ -101,13 +101,13 @@ warning.
 | --- | --- | --- |
 | `Create` (`CreateCart`) | Shopper via BFF, REST `POST /carts` | `[*] -> OPEN` |
 | `AddLine` | Shopper via BFF, REST `POST /carts/{cartId}/lines` | none (adds or merges a line; clears quote and selections) |
-| `SetLineQuantity` | Shopper via BFF, REST `...:set-quantity` | none (sets a quantity; clears quote and selections) |
-| `RemoveLine` | Shopper via BFF, REST `...:remove` | none (removes a line; clears quote and selections) |
-| `SetDestination` | Shopper via BFF, REST `POST /carts/{cartId}:set-destination` | none (sets the prefix; clears quote and selections) |
-| `QuoteDelivery` | Shopper via BFF, REST `POST /carts/{cartId}:quote-delivery` (calls delivery-promise before the aggregate is touched) | none (holds the quote, drops old selections) |
-| `SelectDelivery` | Shopper via BFF, REST `POST /carts/{cartId}:select-delivery` | none (records a selection) |
-| `MergeInto` | Shopper via BFF, REST `POST /carts/{cartId}:merge-into` | `OPEN -> MERGED` (this cart); the target takes the lines |
-| `AcceptRequotedOffers` | checkout, REST `POST /carts/{cartId}/delivery/requoted` | `OPEN -> OPEN` (offers replace the quote and are selected, without calling delivery-promise) |
+| `SetLineQuantity` | Shopper via BFF, REST `PUT /carts/{cartId}/lines/{catalogItemId}` | none (sets a quantity; clears quote and selections) |
+| `RemoveLine` | Shopper via BFF, REST `DELETE /carts/{cartId}/lines/{catalogItemId}` | none (removes a line; clears quote and selections) |
+| `SetDestination` | Shopper via BFF, REST `PUT /carts/{cartId}/destination` | none (sets the prefix; clears quote and selections) |
+| `QuoteDelivery` | Shopper via BFF, REST `POST /carts/{cartId}/delivery-quotes` (calls delivery-promise before the aggregate is touched) | none (holds the quote, drops old selections) |
+| `SelectDelivery` | Shopper via BFF, REST `PUT /carts/{cartId}/delivery-selection` | none (records a selection) |
+| `MergeInto` | Shopper via BFF, REST `POST /carts/{cartId}/merges` | `OPEN -> MERGED` (this cart); the target takes the lines |
+| `AcceptRequotedOffers` | checkout, REST `POST /carts/{cartId}/delivery-requote-acceptances` | `OPEN -> OPEN` (offers replace the quote and are selected, without calling delivery-promise) |
 | `AbandonInactive` | the policy (clock, 30 days) | `OPEN -> ABANDONED` |
 | `CloseOnCheckoutCompleted` | the policy on Kafka `CheckoutCompleted` | `OPEN -> CHECKED_OUT` |
 

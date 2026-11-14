@@ -2,12 +2,12 @@
 id: configuration
 title: Configuration
 sidebar_label: Configuration
-description: "Every environment variable read by cmd/api and cmd/a2a: default, required or not, meaning."
+description: "Every environment variable read by cmd/api, cmd/a2a and cmd/mcp: default, required or not, meaning."
 ---
 
 # Configuration
 
-Shopping Cart ships two binaries and each reads its own environment. Both run on
+Shopping Cart ships three binaries and each reads its own environment. All run on
 real Postgres only; `cmd/api` additionally needs real Kafka and the
 delivery-promise service. There is no in-memory mode and no permissive mode: a
 missing mandatory variable is a boot error that names the variable, raised
@@ -15,7 +15,8 @@ before telemetry, any connection or the listener opens.
 
 Durations are Go durations (`30s`, `5m`, `1h`) unless the row says otherwise.
 Source: `cmd/api/main.go`, `cmd/api/config.go`, `cmd/api/telemetry.go`,
-`cmd/a2a/main.go`, `internal/adapters/outbound/telemetry/telemetry.go`.
+`cmd/a2a/main.go`, `cmd/mcp/main.go`, `cmd/mcp/telemetry.go`,
+`internal/adapters/outbound/telemetry/telemetry.go`.
 
 ## `cmd/api` (REST, consumers, relay, sweepers)
 
@@ -65,6 +66,25 @@ reported together, each naming its variable.
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | no | OTLP/gRPC endpoint of the Collector. |
 | `SERVICE_VERSION` | `dev` | no | `service.version` resource attribute. |
 | `ENVIRONMENT` | `local` | no | `deployment.environment.name` resource attribute. |
+
+## `cmd/mcp` (read-only MCP server)
+
+`cmd/mcp` is a third deployable (ADR 0009). It reads the same Postgres and needs
+no Kafka, no outbox, no consumers, no schedulers and no delivery-promise client,
+so none of those variables apply to it. A missing `DATABASE_URL` and a bad
+`CART_CURRENCY` are reported together, each naming its variable.
+
+| Variable | Default | Required? | Meaning |
+| --- | --- | --- | --- |
+| `MCP_ADDR` | `:8090` | no | Listen address of the Streamable HTTP server (`/mcp`, `/`, `GET /healthz`). |
+| `DATABASE_URL` | none | **yes** | Postgres DSN, the same database as `cmd/api`. Boot error `DATABASE_URL is required` when empty. |
+| `MIGRATIONS_DATABASE_URL` | value of `DATABASE_URL` | no | Direct DSN for the boot migrations (they are idempotent, so any binary may start first). |
+| `CART_CURRENCY` | `USD` | no | Fallback estimate currency. Validated like `cmd/api`; set it to the same value so every surface agrees. |
+| `LOG_LEVEL` | `info` | no | Same values as `cmd/api`. |
+| `OTEL_SERVICE_NAME` | `shopping-cart-mcp` | no | `service.name` of spans and metrics. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `localhost:4317` | no | OTLP/gRPC endpoint of the Collector. |
+| `SERVICE_VERSION` | `dev` | no | `service.version` resource attribute, also logged at boot. |
+| `ENVIRONMENT` | `local` | no | `deployment.environment.name` resource attribute (read by `telemetry.Setup`; the chart does not render it for any component). |
 
 ## Helm values to environment
 

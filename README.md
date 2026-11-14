@@ -26,7 +26,7 @@ mirrors lives in [warehouse-docs](https://iqvo.github.io/warehouse-docs/storefro
 | Domain-driven design | [Ubiquitous language](https://iqvo.github.io/shopping-cart/docs/ddd/ubiquitous-language), [Use cases](https://iqvo.github.io/shopping-cart/docs/ddd/use-cases), [Subdomain classification](https://iqvo.github.io/shopping-cart/docs/ddd/subdomain-classification) |
 | DDD artifacts (ddd-crew) | [Index](https://iqvo.github.io/shopping-cart/docs/ddd/ddd-artifacts), [Core domain chart](https://iqvo.github.io/shopping-cart/docs/ddd/core-domain-chart), [Bounded context canvas](https://iqvo.github.io/shopping-cart/docs/ddd/bounded-context-canvas), [Context map](https://iqvo.github.io/shopping-cart/docs/ddd/context-map), [Aggregate design canvas](https://iqvo.github.io/shopping-cart/docs/ddd/aggregate-design-canvas), [Domain message flow](https://iqvo.github.io/shopping-cart/docs/ddd/domain-message-flow), [EventStorming](https://iqvo.github.io/shopping-cart/docs/ddd/eventstorming), [Class diagrams](https://iqvo.github.io/shopping-cart/docs/ddd/class-diagram), [Entity-relationship](https://iqvo.github.io/shopping-cart/docs/ddd/entity-relationship), [Sequence diagrams](https://iqvo.github.io/shopping-cart/docs/ddd/sequence-diagrams), [Domain events](https://iqvo.github.io/shopping-cart/docs/ddd/domain-events) |
 | API reference | [Overview (REST and A2A)](https://iqvo.github.io/shopping-cart/docs/api-reference), the generated REST reference from [`apis/openapi.yaml`](apis/openapi.yaml), [Event catalogue](https://iqvo.github.io/shopping-cart/docs/api-reference/events) from [`apis/asyncapi.yaml`](apis/asyncapi.yaml) |
-| Ecosystem | [Integration](https://iqvo.github.io/shopping-cart/docs/ecosystem/integration) |
+| Ecosystem | [Integration](https://iqvo.github.io/shopping-cart/docs/ecosystem/integration), [MCP tools](https://iqvo.github.io/shopping-cart/docs/mcp/tools) |
 | Decisions | [ADR index](https://iqvo.github.io/shopping-cart/docs/adr) (sources in [`docs/adr/`](docs/adr/)); the [storefront ADR index](https://iqvo.github.io/warehouse-docs/storefront/adr/) |
 
 Preview locally with `cd docs && npm ci && npm start`.
@@ -39,6 +39,7 @@ Hexagonal / ports & adapters; dependencies point **inward only**.
 cmd/api/                    composition root: REST API, outbox relay, the three Kafka
                             consumers and the two clock-driven policies
 cmd/a2a/                    read-only A2A agent over the same read use cases (ADR 0006)
+cmd/mcp/                    read-only MCP server over the same read use cases (ADR 0009)
 internal/
   domain/                   pure business logic: cart (the aggregate), estimate, shared
   application/
@@ -49,7 +50,7 @@ internal/
     outbox/                 transactional outbox
     views/                  read views
   adapters/
-    inbound/                http (chi), kafka (the three consumers), a2a, requestlog, scheduler
+    inbound/                http (chi), kafka (the three consumers), a2a, mcp, requestlog, scheduler
     outbound/               postgres, kafka, outbox relay, telemetry, deliverypromise
                             (the one sibling client, ADR 0003), clock, ids, memory
                             (test doubles), repocontract
@@ -66,7 +67,9 @@ as an executable test, not a convention:
 arch-go) fails the build if the domain ever imports an outer layer or an
 adapter reaches sideways into a sibling; the same package adds fitness tests
 for the event catalogue vs `apis/asyncapi.yaml`, the A2A adapter's read-only
-rule, Kafka writer acks/topics/DLQ shutdown, the outbox relay cap, and
+rule, the MCP adapter's dependency rule, authority declarations and complete
+surface (`mcp_authority_fitness_test.go`, `mcp_optional_inputs_test.go`), Kafka
+writer acks/topics/DLQ shutdown, the outbox relay cap, and
 no-Go-files-at-root.
 
 ## Domain events
@@ -162,6 +165,12 @@ advertises; both **mandatory**), `A2A_ADDR` (default `:8093`),
 the API's value so both surfaces agree), `LOG_LEVEL` and the shared telemetry
 variables (`OTEL_SERVICE_NAME` defaults to `shopping-cart-a2a`). No Kafka.
 
+`cmd/mcp` (read-only, same rules as `cmd/a2a`) reads `DATABASE_URL` (**mandatory**),
+`MCP_ADDR` (default `:8090`), `MIGRATIONS_DATABASE_URL` (default `DATABASE_URL`),
+`CART_CURRENCY` (set it to the API's value so every surface agrees), `LOG_LEVEL` and
+the shared telemetry variables (`OTEL_SERVICE_NAME` defaults to `shopping-cart-mcp`).
+No Kafka, no delivery-promise.
+
 ## Observability
 
 Logs are JSON on stdout (`LOG_LEVEL`) with `trace_id`/`span_id` when a span is
@@ -210,12 +219,31 @@ it is absent. See ADR [0008](docs/adr/0008-adopt-the-fleet-rest-api-guideline.md
 | `GET` | `/healthz` | Liveness |
 | `GET` | `/readyz` | Readiness (Postgres ping + Kafka metadata) |
 
+## MCP
+
+`cmd/mcp` serves a read-only [Model Context Protocol](https://modelcontextprotocol.io)
+server over Streamable HTTP only (stateless; `/mcp` and `/`, `GET /healthz`),
+beside the REST API and the A2A agent ([ADR 0009](docs/adr/0009-read-only-mcp-server.md)).
+Every tool is a thin wrapper over a use case a REST GET already calls, declares
+authority `L1` under `com.warehouse/authority` and is annotated read-only; there
+is no write tool, and no cart mutation is exposed. Unauthenticated, like every
+endpoint of the fleet. Full reference: [MCP tools](docs/docs/mcp/tools.md).
+
+| Tool | Input | Same as |
+|---|---|---|
+| `get_cart` | `cartId` | `GET /carts/{cartId}` |
+| `list_shopper_carts` | `shopperId`; `state`, `limit` (1 to 100, default 20) optional | `GET /carts?shopperId=&state=&limit=`, first page only (`hasMore` says an older cart exists) |
+
+Beyond tools it serves one resource, `warehouse://shopping-cart/carts/{cartId}`
+(the cart document of one cart), and one prompt, `review_cart` (the operator
+procedure for reading a cart's estimate and checkout readiness).
+
 ## Helm chart
 
 [`charts/shopping-cart`](charts/shopping-cart) — one always-on component: the
 `api` Deployment (REST, relay, the three consumers and the two policies in one
-process); the read-only A2A agent is an optional extra component
-(`a2a.enabled=true`, default off). The chart refuses to render without
+process); the read-only A2A agent and the read-only MCP server are optional extra
+components (`a2a.enabled=true`, `mcp.enabled=true`, both default off). The chart refuses to render without
 `database.*`, `kafka.brokers`, `deliveryPromise.url` and the three
 `config.*ConsumerGroup` values (named in the failure). `DATABASE_URL` always
 comes from a Secret; consumer groups must be stable, service-prefixed ids —
@@ -258,6 +286,19 @@ Unauthenticated, like every endpoint of the fleet.
 - Layout: `cmd/a2a` (composition root), `internal/adapters/inbound/a2a` (card, skills, DTOs).
 - Environment: `DATABASE_URL` and `A2A_AGENT_URL` mandatory; `A2A_ADDR` (default `:8093`), `MIGRATIONS_DATABASE_URL`, `CART_CURRENCY`, `LOG_LEVEL`, `OTEL_*`. No Kafka.
 - Helm: `a2a.enabled=true` (default off), see `charts/shopping-cart/values.yaml`.
+
+### Running the MCP server in Kubernetes
+
+`cmd/mcp` ([ADR 0009](docs/adr/0009-read-only-mcp-server.md)) is the optional
+third binary: the read-only MCP server (`get_cart`, `list_shopper_carts`, one
+resource, one prompt) over the same reads as the REST GETs, Postgres only,
+Streamable HTTP on `/mcp` (`MCP_ADDR`, default `:8090`), `GET /healthz` for the
+probes, unauthenticated (access control is the in-cluster ClusterIP boundary).
+It ships in the same image as `/app/mcp`.
+
+- Layout: `cmd/mcp` (composition root), `internal/adapters/inbound/mcp` (tools, resource, prompt, authority, errors).
+- Environment: `DATABASE_URL` mandatory; `MCP_ADDR` (default `:8090`), `MIGRATIONS_DATABASE_URL`, `CART_CURRENCY`, `LOG_LEVEL`, `OTEL_*`. No Kafka, no delivery-promise.
+- Helm: `mcp.enabled=true` (default off) adds the Deployment and a ClusterIP Service on port 8090; `mcp.route.enabled=true` adds the gateway HTTPRoute `/api/mcp/shopping-cart` (rewritten to `/mcp`; the `parentRefs` come from the environment that deploys the chart). `mcp.extraEnv` refuses `*_MODE`, Kafka, delivery-promise and consumer-group variables. See `charts/shopping-cart/values.yaml`.
 
 ## Local development / quality gate
 
@@ -304,11 +345,11 @@ publish) run only on pushes to `main`, after every other job is green.
 
 ## Architecture Decision Records
 
-[`docs/adr/`](docs/adr/) — 8 ADRs (0001 bounded context, 0002 assumptions,
+[`docs/adr/`](docs/adr/) — 9 ADRs (0001 bounded context, 0002 assumptions,
 0003 consumed contracts and local read model, 0004 CloudEvents envelope and
 type catalogue, 0005 fleet observability standard, 0006 A2A inbound adapter,
 0007 delivery dates in the destination's local calendar, 0008 fleet REST API
-guideline).
+guideline, 0009 read-only MCP server).
 
 ## License
 

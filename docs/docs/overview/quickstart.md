@@ -152,17 +152,17 @@ Repeat the add-line call with a new key and it returns `200` with the line.
 Continue the journey:
 
 ```bash
-curl -s -X POST localhost:8080/carts/$CART:set-destination \
+curl -s -X PUT localhost:8080/carts/$CART/destination \
   -H 'Idempotency-Key: demo-3' -H 'Content-Type: application/json' \
   -d '{"destinationPostalPrefix":"941"}'
-curl -s -X POST localhost:8080/carts/$CART:quote-delivery -H 'Idempotency-Key: demo-4'
+curl -s -X POST localhost:8080/carts/$CART/delivery-quotes -H 'Idempotency-Key: demo-4'
 curl -s localhost:8080/carts/$CART
 curl -s "localhost:8080/carts?shopperId=shopper-1&state=OPEN"
 ```
 
-`quote-delivery` calls delivery-promise; without one running it answers `503`
+`delivery-quotes` calls delivery-promise; without one running it answers `503`
 `delivery-promise-unavailable` (retry with the same key). Select an offer with
-`:select-delivery` (`{"groupNo":1,"offerId":"..."}`) using an `offerId` from
+`PUT /carts/$CART/delivery-selection` (`{"groupNo":1,"offerId":"..."}`) using an `offerId` from
 the quote. Error documents are RFC 9457 `application/problem+json` with `type`
 `/problems/<slug>`; the slugs are listed on
 [API reference](/docs/api-reference). Retrying a `POST` with the same key and

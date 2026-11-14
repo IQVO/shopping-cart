@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -46,12 +47,26 @@ type world struct {
 	status int
 	body   string
 	header http.Header
+
+	// readiness is the /readyz gate; kafkaDown makes its Kafka dependency fail.
+	readiness *httpadapter.Readiness
+	kafkaDown *atomic.Bool
+
+	// doc is the extra state of the documentation-derived rules (steps_rules_test.go).
+	doc docState
 }
 
 func newWorld() *world {
 	clock := memory.NewClock(t0)
 	s := memory.NewStore(clock)
-	w := &world{store: s, clock: clock, quoter: &memory.Quoter{}, versions: map[string]int64{}}
+	w := &world{store: s, clock: clock, quoter: &memory.Quoter{}, versions: map[string]int64{}, kafkaDown: &atomic.Bool{}}
+	down := w.kafkaDown
+	w.readiness = httpadapter.NewReadiness(time.Hour, time.Second, httpadapter.Dependency{Name: "kafka", Check: func(context.Context) error {
+		if down.Load() {
+			return fmt.Errorf("broker unreachable")
+		}
+		return nil
+	}})
 	w.deps = usecases.Deps{
 		Carts: s.Carts(), Items: s.Items(), Schedules: s.Schedules(), TaxTables: s.TaxTables(), Quoter: w.quoter,
 		Inbox: s.Inbox(), Outbox: s.Outbox(), UoW: s.UnitOfWork(), Clock: clock, IDs: &memory.SequentialIDs{}, Currency: "USD",
@@ -75,7 +90,7 @@ func (w *world) api() *httptest.Server {
 			RemoveLine: usecases.RemoveLine{Deps: d}, SetDestination: usecases.SetDestination{Deps: d}, QuoteDelivery: usecases.QuoteDelivery{Deps: d},
 			SelectDelivery: usecases.SelectDelivery{Deps: d}, MergeInto: usecases.MergeInto{Deps: d},
 			AcceptRequotedOffers: usecases.AcceptRequotedOffers{Deps: d}, GetCart: usecases.GetCart{Deps: d}, ListCarts: usecases.ListCarts{Deps: d},
-			IdempotencyStore: w.store.Idempotency(), Clock: d.Clock,
+			IdempotencyStore: w.store.Idempotency(), Clock: d.Clock, Readiness: w.readiness,
 		}, nil, ""))
 	}
 	return w.srv
@@ -100,5 +115,6 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerReadModels(sc, w)
 	registerCommands(sc, w)
 	registerLifecycle(sc, w)
+	registerRules(sc, w)
 	registerAssertions(sc, w)
 }

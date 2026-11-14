@@ -71,7 +71,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Ecosystem',
-      items: ['ecosystem/integration'],
+      items: ['ecosystem/integration', 'mcp/tools'],
     },
     {
       type: 'category',
@@ -116,6 +116,11 @@ const sidebars: SidebarsConfig = {
           type: 'link',
           label: '0007 Delivery dates are days of the destination\'s local calendar',
           href: '/docs/adr/0007-delivery-dates-in-the-destinations-local-calendar',
+        },
+        {
+          type: 'link',
+          label: '0009 A read-only MCP server (authority L1, complete surface)',
+          href: '/docs/adr/0009-read-only-mcp-server',
         },
       ],
     },

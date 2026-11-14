@@ -23,7 +23,7 @@ the answers.
 | --- | --- | --- |
 | REST | `apis/openapi.yaml` (OpenAPI 3.0.3, version 0.1.0) | The pages under *REST* in the sidebar are generated from the spec with `npm run gen-api-docs`; do not edit them by hand. The spec names `http://localhost:8080`; in the kind cluster the service is behind Kong at `/api/shopping-cart` (prefix stripped). |
 | Events | `apis/asyncapi.yaml` (AsyncAPI 3.0.0, version 1.0.0) | Four published events and seven consumed ones, on the [event catalogue](/docs/api-reference/events); every field on [Domain events](/docs/ddd/domain-events). |
-| MCP | none | There is no `cmd/mcp`. |
+| MCP | [ADR 0009](/docs/adr/0009-read-only-mcp-server), [MCP tools](/docs/mcp/tools), `internal/adapters/inbound/mcp` | `cmd/mcp`, Streamable HTTP on `/mcp` (port 8090; through the gateway `/api/mcp/shopping-cart`, off by default in the chart). Two read-only tools (`get_cart`, `list_shopper_carts`), each authority `L1`, one resource and one prompt; no write tool. No auth, by fleet decision. |
 | A2A | [ADR 0006](/docs/adr/0006-a2a-inbound-adapter), `internal/adapters/inbound/a2a` | `cmd/a2a`, JSON-RPC 2.0 on `/` and `/a2a` (port 8093; through Kong `/api/a2a/shopping-cart`), Agent Card at `/.well-known/agent-card.json`. Two read-only skills, no write skill. No auth, by fleet decision. |
 
 ## Endpoints
@@ -37,18 +37,17 @@ requires an `Idempotency-Key` header.
 | Carts | `GET /carts?shopperId=&state=` | `listCarts` | `200 {"carts": [...]}`, newest first | `422` (missing or invalid `shopperId`, unknown `state`) |
 | Carts | `GET /carts/{cartId}` | `getCart` | `200`, the cart with quote, selections, estimate, readiness | `404` |
 | Lines | `POST /carts/{cartId}/lines` | `addCartLine` | `200`; `{"catalogItemId","quantity"}`; merges into an existing line | `404`, `409`, `422` |
-| Lines | `POST /carts/{cartId}/lines/{catalogItemId}:set-quantity` | `setCartLineQuantity` | `200`; `{"quantity"}` | `404`, `409`, `422` |
-| Lines | `POST /carts/{cartId}/lines/{catalogItemId}:remove` | `removeCartLine` | `200` | `404`, `409` |
-| Delivery | `POST /carts/{cartId}:set-destination` | `setCartDestination` | `200`; `{"destinationPostalPrefix"}` | `404`, `409`, `422` |
-| Delivery | `POST /carts/{cartId}:quote-delivery` | `quoteCartDelivery` | `200`; no body; calls delivery-promise | `404`, `409`, `422`, `503` |
-| Delivery | `POST /carts/{cartId}:select-delivery` | `selectCartDelivery` | `200`; `{"groupNo","offerId"}` | `404`, `409`, `422` |
-| Carts | `POST /carts/{cartId}:merge-into` | `mergeCartInto` | `200`, the **target** cart; `{"targetCartId"}` | `404`, `409`, `422` |
-| Delivery | `POST /carts/{cartId}/delivery/requoted` | `acceptRequotedOffers` | `200`; `{"offers": [...]}` replaces quote and selections without calling delivery-promise | `404`, `409`, `422` |
+| Lines | `PUT /carts/{cartId}/lines/{catalogItemId}` | `setCartLineQuantity` | `200`; `{"quantity"}` | `404`, `409`, `422` |
+| Lines | `DELETE /carts/{cartId}/lines/{catalogItemId}` | `removeCartLine` | `200` | `404`, `409` |
+| Delivery | `PUT /carts/{cartId}/destination` | `setCartDestination` | `200`; `{"destinationPostalPrefix"}` | `404`, `409`, `422` |
+| Delivery | `POST /carts/{cartId}/delivery-quotes` | `quoteCartDelivery` | `200`; no body; calls delivery-promise | `404`, `409`, `422`, `503` |
+| Delivery | `PUT /carts/{cartId}/delivery-selection` | `selectCartDelivery` | `200`; `{"groupNo","offerId"}` | `404`, `409`, `422` |
+| Carts | `POST /carts/{cartId}/merges` | `mergeCartInto` | `200`, the **target** cart; `{"targetCartId"}` | `404`, `409`, `422` |
+| Delivery | `POST /carts/{cartId}/delivery-requote-acceptances` | `acceptRequotedOffers` | `200`; `{"offers": [...]}` replaces quote and selections without calling delivery-promise | `404`, `409`, `422` |
 | Health | `GET /healthz`, `GET /readyz` | none (not in the spec) | `200 {"status":"ok"}` / `200 {"status":"ready"}`; `/readyz` answers `503` once shutdown starts or Postgres or Kafka is unreachable | |
 
-The colon routes (`:set-quantity`, `:quote-delivery`, ...) are literal paths of
-the chi router. `/healthz` and `/readyz` are registered by the router but are not
-described in `apis/openapi.yaml`.
+`/healthz` and `/readyz` are registered by the router but are not described in
+`apis/openapi.yaml`.
 
 ## The cart view
 
@@ -73,7 +72,7 @@ Every cart answer is the same document (`cartBody`,
   answer below 500 for a `(route, key)` is stored for 24 hours and replayed with
   the header `Idempotent-Replayed: true`; the same key with a different method,
   path, query or body is `422` `idempotency-key-reused`. A 5xx is never stored.
-  `:quote-delivery` forwards its key to delivery-promise.
+  `POST /carts/{cartId}/delivery-quotes` forwards its key to delivery-promise.
 - **Errors** are RFC 9457 `application/problem+json` with `type`
   `/problems/<slug>`. The slugs: `malformed-request`, `idempotency-key-required`,
   `not-found`, `resource-not-found`, `cart-closed`, `stale-delivery-selection`,
@@ -93,7 +92,7 @@ Every cart answer is the same document (`cartBody`,
   group, or no tax band for the prefix).
 - **Concurrency.** A write that loses the version race is retried once, then
   `409` `concurrent-update`.
-- **Auth:** none. REST, A2A and (absent) MCP are unauthenticated fleet-wide;
+- **Auth:** none. REST, A2A and MCP are unauthenticated fleet-wide;
   `TestNoAuthMiddlewareReintroduced` fails CI if auth middleware returns.
 - **Local calendar.** `deliverByEarliest` and `deliverByLatest` are calendar dates
   in the destination's local time zone ([ADR 0007](/docs/adr/0007-delivery-dates-in-the-destinations-local-calendar)).

@@ -3,6 +3,7 @@ package deliverypromise_test
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -15,9 +16,38 @@ type spec struct {
 			Properties map[string]any `yaml:"properties"`
 		} `yaml:"schemas"`
 	} `yaml:"components"`
-	Paths map[string]map[string]struct {
-		OperationID string `yaml:"operationId"`
-	} `yaml:"paths"`
+	Paths map[string]pathItem `yaml:"paths"`
+}
+
+type operation struct {
+	OperationID string `yaml:"operationId"`
+	Parameters  []struct {
+		Ref string `yaml:"$ref"`
+	} `yaml:"parameters"`
+}
+
+// pathItem keeps only the HTTP-method operations of a path. A path item may also
+// carry `servers` or `parameters` lists (the producer's /reports paths do), which
+// are not operations.
+type pathItem map[string]operation
+
+func (p *pathItem) UnmarshalYAML(n *yaml.Node) error {
+	var raw map[string]yaml.Node
+	if err := n.Decode(&raw); err != nil {
+		return err
+	}
+	*p = pathItem{}
+	for key, node := range raw {
+		switch key {
+		case "get", "put", "post", "delete", "patch", "head", "options", "trace":
+			var op operation
+			if err := node.Decode(&op); err != nil {
+				return err
+			}
+			(*p)[key] = op
+		}
+	}
+	return nil
 }
 
 func loadSpec(t *testing.T) spec {
@@ -56,6 +86,38 @@ func TestTheSpecCopyDeclaresTheRouteWeCall(t *testing.T) {
 	if op := s.Paths["/delivery-quotes"]["post"].OperationID; op != "quoteDeliveryOffers" {
 		t.Fatalf("operationId = %q", op)
 	}
+}
+
+// The gateway refuses to send a keyless POST (fleet REST guideline); that is only
+// right while the contract still requires the header on this route.
+func TestTheSpecCopyRequiresTheIdempotencyKeyOnTheQuoteRoute(t *testing.T) {
+	var raw struct {
+		Components struct {
+			Parameters map[string]struct {
+				Name     string `yaml:"name"`
+				In       string `yaml:"in"`
+				Required bool   `yaml:"required"`
+			} `yaml:"parameters"`
+		} `yaml:"components"`
+	}
+	data, err := os.ReadFile("testdata/delivery-promise.openapi.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range loadSpec(t).Paths["/delivery-quotes"]["post"].Parameters {
+		const prefix = "#/components/parameters/"
+		def, ok := raw.Components.Parameters[strings.TrimPrefix(p.Ref, prefix)]
+		if ok && def.Name == "Idempotency-Key" && def.In == "header" {
+			if !def.Required {
+				t.Fatal("the quote route no longer requires the Idempotency-Key header")
+			}
+			return
+		}
+	}
+	t.Fatal("the quote route does not declare the Idempotency-Key header")
 }
 
 // The gateway reads window.timeZone (ADR 0007); the contract must declare it

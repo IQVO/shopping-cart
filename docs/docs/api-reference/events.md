@@ -106,5 +106,3 @@ environment variable and a dead-letter topic `<topic>.dlq`.
   payloads of the schedule and tax events; the consumer does not read them
   (`scheduleChangedData`, `taxTableChangedData` carry only `version` and the
   tiers or bands).
-- The asyncapi example `CheckoutCompleted` says the producer is "not built yet";
-  the checkout service on the fleet does publish `retailnetwork.checkout.events`.

@@ -21,13 +21,13 @@ never hold a rule. The step-by-step flows are on
 | --- | --- | --- | --- |
 | `CreateCart` | the shopper, via storefront-bff | REST `POST /carts` | none |
 | `AddLine` | the shopper | REST `POST /carts/{cartId}/lines` | `CartLineAdded` |
-| `SetLineQuantity` | the shopper | REST `POST /carts/{cartId}/lines/{catalogItemId}:set-quantity` | none |
-| `RemoveLine` | the shopper | REST `POST /carts/{cartId}/lines/{catalogItemId}:remove` | none |
-| `SetDestination` | the shopper | REST `POST /carts/{cartId}:set-destination` | none |
-| `QuoteDelivery` | the shopper | REST `POST /carts/{cartId}:quote-delivery` | `CartDeliveryQuoted` |
-| `SelectDelivery` | the shopper | REST `POST /carts/{cartId}:select-delivery` | none |
-| `AcceptRequotedOffers` | checkout, after a requote | REST `POST /carts/{cartId}/delivery/requoted` | none |
-| `MergeInto` | the shopper at sign-in | REST `POST /carts/{cartId}:merge-into` | none |
+| `SetLineQuantity` | the shopper | REST `PUT /carts/{cartId}/lines/{catalogItemId}` | none |
+| `RemoveLine` | the shopper | REST `DELETE /carts/{cartId}/lines/{catalogItemId}` | none |
+| `SetDestination` | the shopper | REST `PUT /carts/{cartId}/destination` | none |
+| `QuoteDelivery` | the shopper | REST `POST /carts/{cartId}/delivery-quotes` | `CartDeliveryQuoted` |
+| `SelectDelivery` | the shopper | REST `PUT /carts/{cartId}/delivery-selection` | none |
+| `AcceptRequotedOffers` | checkout, after a requote | REST `POST /carts/{cartId}/delivery-requote-acceptances` | none |
+| `MergeInto` | the shopper at sign-in | REST `POST /carts/{cartId}/merges` | none |
 | `GetCart` | the shopper, checkout, agents | REST `GET /carts/{cartId}`, A2A skill `get_cart` | none |
 | `ListCarts` | the shopper, agents | REST `GET /carts?shopperId=&state=`, A2A skill `list_shopper_carts` | none |
 | `AbandonInactive` | the clock | scheduler job, every `ABANDON_SWEEP_INTERVAL` | `CartAbandoned` |
@@ -94,8 +94,8 @@ never hold a rule. The step-by-step flows are on
 
 ## SetLineQuantity and RemoveLine
 
-- **Triggers:** `POST .../lines/{catalogItemId}:set-quantity` with `quantity`,
-  and `POST .../lines/{catalogItemId}:remove`.
+- **Triggers:** `PUT /carts/{cartId}/lines/{catalogItemId}` with `quantity`,
+  and `DELETE /carts/{cartId}/lines/{catalogItemId}`.
 - **Invariants:** the cart is `OPEN`; the cart holds a line for the item
   (`ErrLineNotFound`, answered `404` `not-found`); for a new quantity, 1 to 99.
 - **Effect:** the line changes or is dropped (the others keep their order); the
@@ -106,7 +106,7 @@ never hold a rule. The step-by-step flows are on
 
 ## SetDestination
 
-- **Trigger:** `POST /carts/{cartId}:set-destination`. **Input:**
+- **Trigger:** `PUT /carts/{cartId}/destination`. **Input:**
   `destinationPostalPrefix`.
 - **Invariants:** the cart is `OPEN`; the prefix is 1 to 10 letters or digits (a
   prefix, never an address).
@@ -117,10 +117,10 @@ never hold a rule. The step-by-step flows are on
 
 ## QuoteDelivery
 
-- **Trigger:** `POST /carts/{cartId}:quote-delivery` (no body).
+- **Trigger:** `POST /carts/{cartId}/delivery-quotes` (no body).
 - **Preconditions:** the cart is `OPEN` and has a destination (`ErrNoDestination`).
 - **Flow:** the cart is read; **outside any transaction** the use case calls
-  delivery-promise `POST /delivery-offers:quote` with the lines and the prefix,
+  delivery-promise `POST /delivery-quotes` with the lines and the prefix,
   forwarding the request's `Idempotency-Key`; then the cart is reloaded and, if
   its `version` is unchanged, the quote is stored in one unit of work. If the cart
   changed in between the quote is stale and the whole attempt runs once more
@@ -139,7 +139,7 @@ never hold a rule. The step-by-step flows are on
 
 ## SelectDelivery
 
-- **Trigger:** `POST /carts/{cartId}:select-delivery`. **Input:** `groupNo`,
+- **Trigger:** `PUT /carts/{cartId}/delivery-selection`. **Input:** `groupNo`,
   `offerId`.
 - **Invariants:** the cart is `OPEN`; the offer belongs to that group of the
   **current** quote (`ErrStaleDeliverySelection`, also when there is no quote).
@@ -152,7 +152,7 @@ never hold a rule. The step-by-step flows are on
 
 ## AcceptRequotedOffers
 
-- **Trigger:** `POST /carts/{cartId}/delivery/requoted`, called by checkout when
+- **Trigger:** `POST /carts/{cartId}/delivery-requote-acceptances`, called by checkout when
   its own requote replaced the offers. **Input:** `offers`, one per group, each
   with `offerId`, `groupNo`, `tier`, `deliverByEarliest`, `deliverByLatest`,
   `expiresAt`.
@@ -166,7 +166,7 @@ never hold a rule. The step-by-step flows are on
 
 ## MergeInto
 
-- **Trigger:** `POST /carts/{cartId}:merge-into`. **Input:** `targetCartId`. The
+- **Trigger:** `POST /carts/{cartId}/merges`. **Input:** `targetCartId`. The
   path cart is the source.
 - **Invariants:** the source is `OPEN`; the target is another `OPEN` cart that has
   a shopper; the source is a guest cart or belongs to the same shopper

@@ -135,7 +135,7 @@ domain call, they raise no event, and a missing line is `404 not-found`
 the offer is not in the current quote, `SetDestination` with `422 validation-failed`
 for a prefix that is not 1 to 10 letters or digits.
 
-## 3. QuoteDelivery (`POST /carts/{cartId}:quote-delivery`)
+## 3. QuoteDelivery (`POST /carts/{cartId}/delivery-quotes`)
 
 The remote call runs outside any transaction.
 
@@ -157,7 +157,7 @@ sequenceDiagram
     else no destination prefix
         UC-->>H: 422 no-destination
     else ready to quote
-        UC->>DP: POST /delivery-offers:quote<br/>lines, prefix, Idempotency-Key forwarded
+        UC->>DP: POST /delivery-quotes<br/>lines, prefix, Idempotency-Key forwarded
         alt timeout (5 s), transport error, 5xx or undecodable reply
             DP-->>UC: ErrDeliveryPromiseUnavailable
             UC-->>H: 503 delivery-promise-unavailable
@@ -187,7 +187,7 @@ A rejected quote (4xx) maps to the same `503` as an unavailable one, with the de
 telling the caller to retry with the same `Idempotency-Key`. The lines and the
 prefix are kept in both cases; no quote is stored.
 
-## 4. MergeInto (`POST /carts/{cartId}:merge-into`)
+## 4. MergeInto (`POST /carts/{cartId}/merges`)
 
 ```mermaid
 %%{init: {"sequence": {"wrap": true, "width": 120, "actorMargin": 24, "messageMargin": 28, "boxMargin": 6, "noteMargin": 6, "mirrorActors": false}}}%%

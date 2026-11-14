@@ -32,7 +32,7 @@ check a design decision against this fleet's standing architecture.
    or `repocontract` (`TestRuntimeBinaryHasNoInMemoryAdapters`,
    `TestRuntimeBinaryDoesNotImportTheRepositoryContract`); the relay is built with
    `WithMaxAttempts` (`TestOutboxRelaysPassAttemptCap`); `/readyz` keeps its
-   empty-topic Kafka metadata check. This repo has no MCP adapter and no analytics
+   empty-topic Kafka metadata check. This repo has a read-only MCP adapter (ADR 0009) and no analytics
    read side.
 5. **Kafka consumer-group pattern correctness.** A new Kafka consumer
    must use either (a) a named long-lived constant for a genuinely

@@ -34,10 +34,10 @@ flowchart LR
     S["Shopper<br/>via storefront-bff"]:::actor
     C0["CreateCart<br/>POST /carts"]:::command
     C1["AddLine<br/>POST /carts/cartId/lines"]:::command
-    C2["SetLineQuantity<br/>POST ...:set-quantity"]:::command
-    C3["RemoveLine<br/>POST ...:remove"]:::command
-    C4["MergeInto<br/>POST /carts/cartId:merge-into"]:::command
-    C4b["AcceptRequotedOffers<br/>POST /carts/cartId/delivery/requoted<br/>OPEN to OPEN, no delivery-promise call"]:::command
+    C2["SetLineQuantity<br/>PUT /carts/cartId/lines/catalogItemId"]:::command
+    C3["RemoveLine<br/>DELETE /carts/cartId/lines/catalogItemId"]:::command
+    C4["MergeInto<br/>POST /carts/cartId/merges"]:::command
+    C4b["AcceptRequotedOffers<br/>POST /carts/cartId/delivery-requote-acceptances<br/>OPEN to OPEN, no delivery-promise call"]:::command
     RM0["PurchasabilityView"]:::readmodel
     G1["Cart"]:::aggregate
     E1["CartLineAdded"]:::event
@@ -86,9 +86,9 @@ offers before authorizing.
 ```mermaid
 flowchart LR
     S["Shopper<br/>via storefront-bff"]:::actor
-    C5["SetDestination<br/>POST ...:set-destination"]:::command
-    C6["QuoteDelivery<br/>POST ...:quote-delivery"]:::command
-    C7["SelectDelivery<br/>POST ...:select-delivery"]:::command
+    C5["SetDestination<br/>PUT /carts/cartId/destination"]:::command
+    C6["QuoteDelivery<br/>POST /carts/cartId/delivery-quotes"]:::command
+    C7["SelectDelivery<br/>PUT /carts/cartId/delivery-selection"]:::command
     DP["delivery-promise<br/>(network)"]:::external
     Q["Delivery Quote<br/>groups, QuotedOffers,<br/>unavailable tiers"]:::aggregate
     G1["Cart"]:::aggregate
@@ -100,7 +100,7 @@ flowchart LR
     S --> C5
     S --> C6
     S --> C7
-    C6 -->|qry QuoteDeliveryOffers<br/>POST /delivery-offers:quote| DP
+    C6 -->|qry QuoteDeliveryOffers<br/>POST /delivery-quotes| DP
     DP -->|groups with offers,<br/>windows, expiries| Q
     C6 -->|ErrNoDestination<br/>without a prefix| G1
     Q --> G1

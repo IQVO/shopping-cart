@@ -35,11 +35,11 @@ sequenceDiagram
     Note over SC: ErrItemNotPurchasable against<br/>PurchasabilityView,<br/>ErrQuantityOutOfRange,<br/>ErrTooManyLines
     SC->>K: evt: cart.CartLineAdded
     SC-->>BFF: cmd: reply 200 cart
-    BFF->>SC: cmd: SetDestination<br/>POST /carts/cartId:set-destination
+    BFF->>SC: cmd: SetDestination<br/>PUT /carts/cartId/destination
     Note over SC: clears quote and selections
-    BFF->>SC: cmd: QuoteDelivery<br/>POST /carts/cartId:quote-delivery
+    BFF->>SC: cmd: QuoteDelivery<br/>POST /carts/cartId/delivery-quotes
     Note over SC: ErrNoDestination without a prefix
-    SC->>DP: qry: QuoteDeliveryOffers<br/>POST /delivery-offers:quote
+    SC->>DP: qry: QuoteDeliveryOffers<br/>POST /delivery-quotes
     DP-->>SC: qry: reply groups, offers,<br/>windows, expiries,<br/>unavailable tiers
     Note over SC: quote held, holds no capacity
     SC->>K: evt: cart.CartDeliveryQuoted
@@ -101,7 +101,7 @@ sequenceDiagram
     participant BFF as storefront-bff
     participant SC as shopping-cart
     S->>BFF: pick a tier per shipment group
-    BFF->>SC: cmd: SelectDelivery<br/>POST /carts/cartId:select-delivery
+    BFF->>SC: cmd: SelectDelivery<br/>PUT /carts/cartId/delivery-selection
     alt the offer is not of the current quote
         SC-->>BFF: cmd: reply 409<br/>ErrStaleDeliverySelection
     else quote already cleared by a change

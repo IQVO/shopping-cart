@@ -81,6 +81,13 @@ Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 000
 {{- end }}
 
 {{/*
+Fully qualified name of the MCP server Deployment/Service (<release>-mcp, ADR 0009).
+*/}}
+{{- define "shopping-cart.mcpFullname" -}}
+{{- include "shopping-cart.fullname" . }}-mcp
+{{- end }}
+
+{{/*
 Image reference. The release job publishes the image as v<version> (and packages
 the chart with appVersion <version>), so an empty image.tag means "v" + appVersion.
 */}}
@@ -188,6 +195,40 @@ The port of HTTP_ADDR is the container port the probes and the Service target.
 {{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.config.httpAddr)) -}}
 {{- if ne $port (toString .Values.service.targetPort) -}}
 {{- fail (printf "config.httpAddr is %q but service.targetPort is %v: the container port, the probes and the Service must agree." .Values.config.httpAddr .Values.service.targetPort) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The port of mcp.httpAddr is the container port the mcp probes and Service target.
+*/}}
+{{- define "shopping-cart.requireMcpPort" -}}
+{{- $port := trimPrefix ":" (regexFind ":[0-9]+$" (toString .Values.mcp.httpAddr)) -}}
+{{- if ne $port (toString .Values.mcp.service.targetPort) -}}
+{{- fail (printf "mcp.httpAddr is %q but mcp.service.targetPort is %v: the container port, the probes and the Service must agree." .Values.mcp.httpAddr .Values.mcp.service.targetPort) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+mcp.extraEnv may not bring back what the read-only MCP server must never have:
+no *_MODE variable (this service has no mode), nothing of the write or event
+side (Kafka, the delivery-promise client, the consumer groups, the outbox relay,
+the sweeps), and none of the variables the mcp Deployment renders itself (the
+same variable is never set twice).
+*/}}
+{{- define "shopping-cart.requireCleanMcpExtraEnv" -}}
+{{- $owned := list "MCP_ADDR" "LOG_LEVEL" "SERVICE_VERSION" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "CART_CURRENCY" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
+{{- $writeSide := list "HTTP_ADDR" "KAFKA_BROKERS" "EVENT_PUBLISHER" "DELIVERY_PROMISE_URL" "DELIVERY_PROMISE_TIMEOUT" "ABANDON_SWEEP_INTERVAL" "PURGE_SWEEP_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" -}}
+{{- range .Values.mcp.extraEnv -}}
+{{- $name := toString .name -}}
+{{- if hasSuffix "_MODE" $name -}}
+{{- fail (printf "mcp.extraEnv sets %s: *_MODE variables do not exist here - shopping-cart runs on real Postgres only, with no permissive, off or in-memory mode." $name) -}}
+{{- end -}}
+{{- if or (hasSuffix "_CONSUMER_GROUP" $name) (has $name $writeSide) -}}
+{{- fail (printf "mcp.extraEnv sets %s, which belongs to the write or event side: the MCP server is read-only (ADR 0009) and never dials Kafka or delivery-promise." $name) -}}
+{{- end -}}
+{{- if has $name $owned -}}
+{{- fail (printf "mcp.extraEnv sets %s, which the chart renders from its own values: use that value instead." $name) -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
