@@ -7,6 +7,12 @@ the producer now declares `DeliveryWindow.timeZone`). It is listed in `contracts
 Refresh = copy the producer's file over it, never edit it, then fix what the contract tests report.
 Only `POST /delivery-quotes` (operation `quoteDeliveryOffers`) is called by shopping-cart.
 
+Re-pinned 2026-11-14 after delivery-promise ADR 0026 (CARRIER_HANDOFF areas: `carrierId`, `handoffNodeId`,
+`carrierArea`, `carrierWindowHours`) and ADR 0027 (`pickupPointId`; exactly one of `destinationPostalPrefix` or
+`pickupPointId`). All of it is additive for this caller: the cart still sends `destinationPostalPrefix` and
+its tolerant decoder ignores the new response fields. Whether the cart should carry a pickup point or show a
+carrier window is a product decision, not part of a re-pin.
+
 `quote-response.example.json` is a response that satisfies the `QuoteResponse` schema of that copy (the spec
 carries no inline example for this route). `TestExampleSatisfiesTheSpec` checks it against the copy's
 `required` lists, and `TestGatewayDecodesTheSpecExample` feeds it through the gateway. Its first offer names
