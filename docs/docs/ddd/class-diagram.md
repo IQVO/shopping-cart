@@ -247,7 +247,7 @@ flowchart TB
     subgraph OUT["internal/adapters/outbound"]
         A1["postgres<br/>repositories, outbox, inbox,<br/>idempotency store, UoW"]
         A2["kafka + outbox<br/>encoder, writer, relay"]
-        A3["deliverypromise<br/>REST POST /delivery-offers:quote<br/>(the one outbound client)"]
+        A3["deliverypromise<br/>REST POST /delivery-quotes<br/>(the one outbound client)"]
         A4["telemetry, clock, ids"]
     end
     HTTP --> APP

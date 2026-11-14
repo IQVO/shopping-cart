@@ -42,7 +42,7 @@ missing one.
 | `database.url` or `database.existingSecret` | `DATABASE_URL` | Postgres DSN, always injected from a Secret (`secretKeyRef`), never the ConfigMap |
 | `database.migrationsExistingSecretKey` / `database.migrationsUrl` | `MIGRATIONS_DATABASE_URL` | Direct (non-pooled, session-mode) DSN for the boot migrations; the Secret key is `optional: true`, the binary falls back to `DATABASE_URL` |
 | `kafka.brokers` | `KAFKA_BROKERS` | Comma-separated brokers for the relay, the consumers and `/readyz` |
-| `deliveryPromise.url` | `DELIVERY_PROMISE_URL` | `:quote-delivery` calls delivery-promise |
+| `deliveryPromise.url` | `DELIVERY_PROMISE_URL` | `POST /carts/{cartId}/delivery-quotes` calls delivery-promise |
 | `config.offerAvailabilityConsumerGroup` | `OFFER_AVAILABILITY_CONSUMER_GROUP` | Stable, service-prefixed group id, never the pod name |
 | `config.pricingConsumerGroup` | `PRICING_CONSUMER_GROUP` | same |
 | `config.checkoutConsumerGroup` | `CHECKOUT_CONSUMER_GROUP` | same |

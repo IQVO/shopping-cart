@@ -31,7 +31,7 @@ module, and only `cmd/` wires the layers together. Everything on this page is on
 | Outbound adapter | `internal/adapters/outbound/postgres` | pgxpool repositories (`carts`, read models, inbox, idempotency, outbox), the unit of work (`pgtx`), embedded migrations (`migrate.go`), trace-header injection into outbox rows. |
 | Outbound adapter | `internal/adapters/outbound/kafka` | The CloudEvents `Encoder` for the four published events, `NewWriter` (acks from all replicas, hash balancer, no fixed topic), the relay `Sink`, `BrokerCheck` (the Kafka half of `/readyz`). |
 | Outbound adapter | `internal/adapters/outbound/outbox` | The relay loop that drains `outbox_events` to the sink. |
-| Outbound adapter | `internal/adapters/outbound/deliverypromise` | The HTTP client of `POST /delivery-offers:quote` and the time-zone resolution of offer windows (ADR 0007). |
+| Outbound adapter | `internal/adapters/outbound/deliverypromise` | The HTTP client of `POST /delivery-quotes` and the time-zone resolution of offer windows (ADR 0007). |
 | Outbound adapter | `internal/adapters/outbound/{telemetry,clock,ids}` | OpenTelemetry setup and the `cart.lines.added` counter; the system clock; the cart id generator. |
 | Outbound adapter | `internal/adapters/outbound/memory` | In-memory implementation of every port: a **test double** for the unit and godog suites. The shipped binaries never import it (`TestRuntimeBinaryHasNoInMemoryAdapters`). |
 | Kafka envelope | `internal/adapters/kafka/cloudevents` | The only place a CloudEvents 1.0 envelope is built or decoded: `New(Spec)`, `Decode`, `Type`, `DataSchema`. `Repo`/`Context` = `shopping-cart`, `Source` = `/retailnetwork/shopping-cart`. |
@@ -61,7 +61,7 @@ flowchart TB
     OA["offer-availability<br/>retailnetwork.offer-availability.events"]
     PR["pricing<br/>retailnetwork.pricing.events"]
     CK["checkout<br/>retailnetwork.checkout.events"]
-    DP["delivery-promise<br/>POST /delivery-offers:quote"]
+    DP["delivery-promise<br/>POST /delivery-quotes"]
     subgraph api["cmd/api (one process)"]
         direction TB
         http["inbound/http<br/>chi, problem+json, Idempotency-Key"]
