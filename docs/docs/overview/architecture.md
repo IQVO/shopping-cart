@@ -3,7 +3,7 @@ id: architecture
 title: Architecture
 sidebar_label: Architecture
 sidebar_position: 2
-description: "Shopping Cart's hexagonal layout: domain, application, inbound and outbound adapters, the two binaries cmd/api and cmd/a2a with their ports, a container diagram, the Postgres tables and Kafka topics, and the fitness tests that police the rules."
+description: "Shopping Cart's hexagonal layout: domain, application, inbound and outbound adapters, the three binaries cmd/api, cmd/a2a and cmd/mcp with their ports, a container diagram, the Postgres tables and Kafka topics, and the fitness tests that police the rules."
 ---
 
 # Architecture
@@ -27,6 +27,7 @@ module, and only `cmd/` wires the layers together. Everything on this page is on
 | Inbound adapter | `internal/adapters/inbound/kafka` | The three consumers (offer-availability, pricing, checkout): CloudEvents decode, dispatch on the full `type`, retry with backoff, dead-letter topic, a consumer span per attempt. Decode only; every effect is a use case. |
 | Inbound adapter | `internal/adapters/inbound/scheduler` | Timer-driven jobs that call the `AbandonInactive` and `PurgeAbandonedCarts` use cases in batches of 200. |
 | Inbound adapter | `internal/adapters/inbound/a2a` | The A2A skills `get_cart` and `list_shopper_carts`, the Agent Card, strict skill-request parsing. Read-only; depends on application and domain only. |
+| Inbound adapter | `internal/adapters/inbound/mcp` | The MCP tools `get_cart` and `list_shopper_carts` (authority L1), the cart resource and the `review_cart` prompt over the stateless Streamable HTTP handler ([ADR 0009](/docs/adr/0009-read-only-mcp-server)). Read-only; depends on application and domain only, and only `cmd/mcp` imports it. |
 | Inbound adapter | `internal/adapters/inbound/requestlog` | The access-log middleware (method, route pattern, status, duration, request id). |
 | Outbound adapter | `internal/adapters/outbound/postgres` | pgxpool repositories (`carts`, read models, inbox, idempotency, outbox), the unit of work (`pgtx`), embedded migrations (`migrate.go`), trace-header injection into outbox rows. |
 | Outbound adapter | `internal/adapters/outbound/kafka` | The CloudEvents `Encoder` for the four published events, `NewWriter` (acks from all replicas, hash balancer, no fixed topic), the relay `Sink`, `BrokerCheck` (the Kafka half of `/readyz`). |
@@ -36,7 +37,7 @@ module, and only `cmd/` wires the layers together. Everything on this page is on
 | Outbound adapter | `internal/adapters/outbound/memory` | In-memory implementation of every port: a **test double** for the unit and godog suites. The shipped binaries never import it (`TestRuntimeBinaryHasNoInMemoryAdapters`). |
 | Kafka envelope | `internal/adapters/kafka/cloudevents` | The only place a CloudEvents 1.0 envelope is built or decoded: `New(Spec)`, `Decode`, `Type`, `DataSchema`. `Repo`/`Context` = `shopping-cart`, `Source` = `/retailnetwork/shopping-cart`. |
 | Support | `internal/bootretry` | Exponential-backoff retry for the first outbound dials at boot (migrations, Postgres ping). |
-| Composition roots | `cmd/api`, `cmd/a2a` | `main.go`, `config.go`, `telemetry.go`, `tzdata.go` (embeds the zone database) and, for a2a, `router.go`. |
+| Composition roots | `cmd/api`, `cmd/a2a`, `cmd/mcp` | `main.go`, `config.go`, `telemetry.go`, `tzdata.go` (embeds the zone database) and, for a2a and mcp, `router.go`. |
 | Test support | `internal/testing/{kafkatest,pgtest}`, `internal/adapters/outbound/repocontract` | Testcontainers helpers and the repository contract suite run against both the memory and Postgres adapters. |
 | Fitness tests | `internal/architecture` | arch-go and source-scanning tests, see [Testing](/docs/development/testing). |
 
@@ -46,9 +47,10 @@ module, and only `cmd/` wires the layers together. Everything on this page is on
 | --- | --- | --- | --- |
 | `cmd/api` | REST API, the outbox relay, the offer-availability, pricing and checkout consumers and the `AbandonInactive` and `PurgeAbandonedCarts` sweeps, all always on, in one process, on real Postgres and Kafka. | `HTTP_ADDR`, default `:8080` | `GET /healthz` (liveness), `GET /readyz` (drain gate, Postgres ping, a Kafka broker answers a metadata request) |
 | `cmd/a2a` | Read-only Agent2Agent agent ([ADR 0006](/docs/adr/0006-a2a-inbound-adapter)): JSON-RPC 2.0 at `/` and `/a2a`, Agent Card at `/.well-known/agent-card.json`. Same Postgres and the same `GetCart` and `ListCarts` use cases as the REST reads; no Kafka, outbox, consumer, sweeper or delivery-promise client. | `A2A_ADDR`, default `:8093` | `GET /healthz` |
+| `cmd/mcp` | Read-only MCP server ([ADR 0009](/docs/adr/0009-read-only-mcp-server)): Streamable HTTP at `/mcp` and `/`, the tools `get_cart` and `list_shopper_carts`, one resource, one prompt ([MCP tools](/docs/mcp/tools)). Same Postgres and the same two use cases; no Kafka, outbox, consumer, sweeper or delivery-promise client. | `MCP_ADDR`, default `:8090` | `GET /healthz` |
 
-There is no `cmd/mcp`. Both binaries run the same embedded migration at boot
-(idempotent), so either may start first. Startup order, shutdown order and the
+The three binaries run the same embedded migration at boot
+(idempotent), so any of them may start first. Startup order, shutdown order and the
 probes are in the [Runbook](/docs/operations/runbook); every variable is in
 [Configuration](/docs/operations/configuration).
 

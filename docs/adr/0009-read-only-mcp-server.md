@@ -12,7 +12,7 @@ unchanged.
 
 Every other bounded context of the fleet that exposes an HTTP API also ships an MCP
 server so that agents (warehouse-ops-agent first) can read its data without a
-bespoke REST client (fleet ADR 0008: one MCP server per bounded context, an additive
+bespoke REST client (the fleet's ADR 0008 in warehouse-docs: one MCP server per bounded context, an additive
 inbound adapter, the official MCP Go SDK, Streamable HTTP only, a separate `cmd/mcp`
 binary). shopping-cart had an A2A agent and a REST API but no MCP server.
 

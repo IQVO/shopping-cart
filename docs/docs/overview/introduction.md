@@ -20,16 +20,18 @@ charges, plus the destination's tax band) so the total cost is visible up front.
 The binding total is never the cart's: it is the checkout session's price quote.
 
 :::info What runs on develop
-Two binaries, both on real Postgres only. `cmd/api` serves REST (`:8080`) and runs
+Three binaries, all on real Postgres only. `cmd/api` serves REST (`:8080`) and runs
 the transactional outbox relay, three always-on Kafka consumers
 (offer-availability, pricing, checkout) and two clock-driven sweeps in one
 process; it also needs real Kafka and the delivery-promise service. `cmd/a2a`
 (`:8093`, [ADR 0006](/docs/adr/0006-a2a-inbound-adapter)) is a separate, read-only
-Agent2Agent agent over the same database. There is no in-memory mode, no MCP
-server and no authentication: REST and A2A are unauthenticated fleet-wide.
+Agent2Agent agent over the same database, and `cmd/mcp` (`:8090`,
+[ADR 0009](/docs/adr/0009-read-only-mcp-server)) a separate, read-only MCP server
+over it. There is no in-memory mode and no authentication: REST, A2A and MCP are
+unauthenticated fleet-wide.
 
 Packaged: a `Dockerfile` that builds every `cmd/*`, and the Helm chart
-`charts/shopping-cart` (the A2A component is off by default). The kind cluster
+`charts/shopping-cart` (the A2A and MCP components are off by default). The kind cluster
 deploys it through warehouse-infra, which also ships a Grafana dashboard and
 alert rules for it ([Observability](/docs/operations/observability)).
 :::
