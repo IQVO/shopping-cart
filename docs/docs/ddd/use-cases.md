@@ -47,9 +47,12 @@ never hold a rule. The step-by-step flows are on
   attempt once on fresh state (`commandAttempts = 2`), then the REST adapter
   answers `409` `concurrent-update`.
 - **Idempotency.** Every `POST` route requires an `Idempotency-Key` header of 1
-  to 128 characters. The first response below 500 for a `(route, key)` is stored
-  for 24 hours and replayed with `Idempotent-Replayed: true`; the same key with a
-  different request is `422` `idempotency-key-reused`; a 5xx is never stored.
+  to 128 printable ASCII characters (absent is `400` `idempotency-key-required`,
+  malformed or over 128 characters is `400` `idempotency-key-invalid`). The first
+  response below 500 for a key is stored for 24 hours and replayed with
+  `Idempotency-Replayed: true`; the same key with a different method, path or body
+  (another route included) is `409` `idempotency-key-reused`; a 5xx is never
+  stored.
 - **Ids.** A `cartId`, `shopperId`, `catalogItemId` or `offerId` is an opaque id
   of 1 to 64 characters from `A-Z a-z 0-9 . _ : -`, starting with a letter or a
   digit (`shared.ValidID`). A request path identifier longer than 128 characters
