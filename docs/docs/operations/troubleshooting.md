@@ -34,9 +34,10 @@ are in the [Runbook](/docs/operations/runbook).
 | Every `POST /carts/{cartId}/lines` answers `422` `item-not-purchasable` | The local copy of the catalogue (`rm_items`) does not mark the item as catalogued, not discontinued **and** priced. It is fed only by Kafka (`CatalogItemCreated`, `ItemPriceChanged`); it is empty on a fresh database, and an item discontinued upstream or whose price was withdrawn is refused | `SELECT * FROM rm_items WHERE catalog_item_id = '<id>'`; the `cart.lines.added` counter with `reason=item-not-purchasable` | Make sure offer-availability and pricing publish to **this** broker and that the pricing and offer-availability consumers are running (`consumer running` lines, no lag). A producer that published before this service's groups first started is only read if the topic retained the messages |
 | Add-line works for some items and is refused for others | The row exists with `catalogued = false` (a price event arrived before `CatalogItemCreated`, so the row is a stub) or `priced = false` | the same query | Wait for the missing event, or ask the producer to republish |
 | The estimate shows `estimateComplete: false` or zero charges | `rm_current_schedule` or `rm_current_tax_table` is empty or an item has no price; the estimate is labelled non-binding and incomplete rather than guessed | `SELECT version FROM rm_current_schedule`; same for `rm_current_tax_table` | Same as above: the pricing events `DeliveryChargeScheduleChanged` and `TaxTableChanged` must arrive. `CART_CURRENCY` is only the fallback currency before any price states one |
-| A retry after a failed call keeps returning the same error even though the cause is fixed | Idempotency: the first response below 500 for a `(route, key)` is stored for 24 hours and **replayed** (header `Idempotent-Replayed: true`), including a 4xx. A 5xx is never stored | the response header; `SELECT status, created_at FROM idempotency_keys WHERE key = '<key>'` | Use a new `Idempotency-Key` for a new attempt after a 4xx; reuse the same key only to retry an unanswered or 5xx call |
-| `POST` answers `400` `idempotency-key-required` | The `Idempotency-Key` header is missing or longer than 128 characters (every `POST` route requires it) | request headers | Send a unique key of 1 to 128 characters per logical request |
-| `POST` answers `422` `idempotency-key-reused` | The same key was sent with a different method, path, query or body | compare with the first request | Use a fresh key for a different request |
+| A retry after a failed call keeps returning the same error even though the cause is fixed | Idempotency: the first response below 500 for a key is stored for 24 hours and **replayed** (header `Idempotency-Replayed: true`), including a 4xx. A 5xx is never stored | the response header; `SELECT status, created_at FROM idempotency_keys WHERE key = '<key>'` | Use a new `Idempotency-Key` for a new attempt after a 4xx; reuse the same key only to retry an unanswered or 5xx call |
+| `POST` answers `400` `idempotency-key-required` | The `Idempotency-Key` header is missing (every `POST` route requires it) | request headers | Send a unique key of 1 to 128 printable ASCII characters per logical request |
+| `POST` answers `400` `idempotency-key-invalid` | The key is longer than 128 characters or has a character outside printable ASCII | request headers | Send a unique key of 1 to 128 printable ASCII characters |
+| `POST` answers `409` `idempotency-key-reused` | The same key was sent with a different method, path or body (the key is global: another route or cart counts) | compare with the first request | Use a fresh key for a different request |
 | `POST` answers `409` `concurrent-update` | Another writer changed the cart between its load and save (version guard). The command is already retried once internally | repeats under load on one cart | Retry the call; the client holds a stale view |
 | `POST /carts/{cartId}/delivery-quotes` answers `503` `delivery-promise-unavailable` | delivery-promise timed out (`DELIVERY_PROMISE_TIMEOUT`, default 5 s), refused the connection, answered 5xx or an undecodable body, **or** answered 4xx (a rejected request is reported the same way and is a contract bug) | `DELIVERY_PROMISE_URL`; reach `POST /delivery-quotes` on it by hand; a 4xx detail is inside the error chain, not in the response | Fix the URL or the dependency, then retry with the same `Idempotency-Key`; a 5xx was not stored. Nothing else in the service needs delivery-promise |
 | Delivery dates are one day off, or WARN `delivery window time zone unusable; delivery dates fall back to UTC` | The offer window named no `timeZone`, `Local`, or a name the zone database does not know, so dates use UTC instead of the destination's calendar day (ADR 0007). The image embeds tzdata (`cmd/api/tzdata.go`) | the `timeZone` and `reason` fields; logged once per zone name | Fix delivery-promise to send an IANA zone for the serving station |
@@ -57,7 +58,8 @@ Every error is `application/problem+json` with `type` `/problems/<slug>`
 | Slug | Status | Raised when |
 | --- | --- | --- |
 | `malformed-request` | 400 | body or parameter the adapter rejects |
-| `idempotency-key-required` | 400 | missing or over-long `Idempotency-Key` |
+| `idempotency-key-required` | 400 | missing `Idempotency-Key` |
+| `idempotency-key-invalid` | 400 | `Idempotency-Key` over 128 characters or not printable ASCII |
 | `not-found` | 404 | unknown cart, or a line that is not in the cart |
 | `resource-not-found` | 404 | a NUL character in the request path |
 | `cart-closed` | 409 | the cart is no longer `OPEN` |
@@ -70,7 +72,7 @@ Every error is `application/problem+json` with `type` `/problems/<slug>`
 | `no-destination` | 422 | quote requested before a destination |
 | `merge-target` | 422 | invalid merge target |
 | `validation-failed` | 422 | a value the domain refuses |
-| `idempotency-key-reused` | 422 | the same key with a different request |
+| `idempotency-key-reused` | 409 | the same key with a different request |
 | `delivery-promise-unavailable` | 503 | delivery-promise failed or rejected the quote |
 | `dependency-unavailable` | 503 | `/readyz`: Postgres or Kafka unreachable |
 | `internal-error` | 500 | anything else |
