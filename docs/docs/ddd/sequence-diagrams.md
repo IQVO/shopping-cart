@@ -40,18 +40,20 @@ sequenceDiagram
     participant DB as Postgres
     participant UC as handler and UC
     C->>H: POST with Idempotency-Key
-    alt key missing or over 128 characters
+    alt key missing
         H-->>C: 400 idempotency-key-required
+    else key over 128 characters or not printable ASCII
+        H-->>C: 400 idempotency-key-invalid
     else body over the size limit
         H-->>C: 400 malformed-request
     else key valid
         H->>DB: Get(route, key)
         alt a record exists
-            alt same method, path, query and body
+            alt same method, path and body
                 DB-->>H: stored status and body
-                H-->>C: replay, header Idempotent-Replayed true
+                H-->>C: replay, header Idempotency-Replayed true
             else another request under the same key
-                H-->>C: 422 idempotency-key-reused
+                H-->>C: 409 idempotency-key-reused
             end
         else none
             H->>UC: run the handler
