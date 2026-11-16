@@ -120,3 +120,21 @@ func TestValidPrefixCharacterBoundaries(t *testing.T) {
 		}
 	}
 }
+
+func TestQuoteDeliveryUnavailableGroupNumberBounds(t *testing.T) {
+	unavailable := func(groupNo int) DeliveryQuote {
+		return DeliveryQuote{QuotedAt: at(3), Unavailable: []TierUnavailable{{Tier: TierStandard, Constraint: "X", GroupNo: groupNo}}}
+	}
+	for _, groupNo := range []int{0, 1} {
+		c := withLine(t, newCart(t), "item-a", 1)
+		_ = c.SetDestination("787", at(2))
+		if err := c.QuoteDelivery(unavailable(groupNo), at(3)); err != nil {
+			t.Fatalf("an unavailable tier with group number %d must be accepted: %v", groupNo, err)
+		}
+	}
+	c := withLine(t, newCart(t), "item-a", 1)
+	_ = c.SetDestination("787", at(2))
+	if err := c.QuoteDelivery(unavailable(-1), at(3)); err == nil {
+		t.Fatal("an unavailable tier with a negative group number must be refused")
+	}
+}

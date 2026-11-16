@@ -143,3 +143,19 @@ func TestLineCommandsRefuseAClosedCart(t *testing.T) {
 		}
 	}
 }
+
+func TestSetLineQuantityAndRemoveLineReachTheFirstLine(t *testing.T) {
+	c := withLine(t, withLine(t, newCart(t), "item-a", 1), "item-b", 2)
+	if err := c.SetLineQuantity("item-a", 7, at(2)); err != nil {
+		t.Fatalf("SetLineQuantity on the first line: %v", err)
+	}
+	if got := c.Lines(); got[0].CatalogItemID != "item-a" || got[0].Quantity != 7 || got[1].Quantity != 2 {
+		t.Fatalf("lines = %+v, want item-a x7 then item-b x2", got)
+	}
+	if err := c.RemoveLine("item-a", at(3)); err != nil {
+		t.Fatalf("RemoveLine on the first line: %v", err)
+	}
+	if got := c.Lines(); len(got) != 1 || got[0].CatalogItemID != "item-b" || got[0].Quantity != 2 {
+		t.Fatalf("lines = %+v, want only item-b x2", got)
+	}
+}
