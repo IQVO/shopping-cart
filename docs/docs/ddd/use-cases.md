@@ -131,8 +131,11 @@ never hold a rule. The step-by-step flows are on
 - **Invariants on the quote:** group numbers start at 1 and are unique; line
   numbers lie within the cart's lines and belong to one group; each offer belongs
   to its group, has a valid id, a known tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`,
-  `STANDARD`), two dates (`deliverByEarliest` not after `deliverByLatest`) and an
-  `expiresAt`. A quote holds no capacity.
+  `STANDARD`, `CONSOLIDATED`), two dates (`deliverByEarliest` not after
+  `deliverByLatest`) and an `expiresAt`. An offer may carry a `capacityBand`
+  (`AMPLE`, `TIGHT`, `SCARCE`) and, for `CONSOLIDATED` only, `consolidationEligible`
+  ([ADR 0010](/docs/adr/0010-accept-the-consolidated-tier-and-the-capacity-band)).
+  A quote holds no capacity.
 - **Effect:** the quote replaces any previous one; the selections are cleared.
 - **Events:** `CartDeliveryQuoted` (destination prefix and group count; no offer
   detail).

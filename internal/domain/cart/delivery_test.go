@@ -5,6 +5,8 @@ import (
 	"testing"
 )
 
+func boolPtr(v bool) *bool { return &v }
+
 func TestSetDestinationStoresThePrefixAndClearsTheQuote(t *testing.T) {
 	c := quoted(t)
 	if err := c.SetDestination("100", at(5)); err != nil {
@@ -136,5 +138,100 @@ func TestQuoteDeliveryUnavailableGroupNumberBounds(t *testing.T) {
 	_ = c.SetDestination("787", at(2))
 	if err := c.QuoteDelivery(unavailable(-1), at(3)); err == nil {
 		t.Fatal("an unavailable tier with a negative group number must be refused")
+	}
+}
+
+func TestConsolidatedOfferCarriesItsFieldsThroughTheQuote(t *testing.T) {
+	for _, eligible := range []bool{true, false} {
+		c := withLine(t, newCart(t), "item-a", 1)
+		_ = c.SetDestination("787", at(2))
+		o := offer("o1", 1, TierConsolidated, at(30))
+		o.ConsolidationEligible, o.CapacityBand = boolPtr(eligible), BandTight
+		std := offer("o2", 1, TierStandard, at(30))
+		std.CapacityBand = BandScarce
+		q := DeliveryQuote{QuotedAt: at(3), Groups: []QuoteGroup{{GroupNo: 1, LineNos: []int{1}, Offers: []QuotedOffer{o, std}}}}
+		if err := c.QuoteDelivery(q, at(3)); err != nil {
+			t.Fatal(err)
+		}
+		if err := c.SelectDelivery(1, "o1", at(4)); err != nil {
+			t.Fatal(err)
+		}
+		got := c.Quote().Groups[0].Offers
+		if got[0].Tier != TierConsolidated || got[0].ConsolidationEligible == nil || *got[0].ConsolidationEligible != eligible || got[0].CapacityBand != BandTight {
+			t.Fatalf("consolidated offer = %+v", got[0])
+		}
+		if got[1].ConsolidationEligible != nil || got[1].CapacityBand != BandScarce {
+			t.Fatalf("standard offer = %+v", got[1])
+		}
+		if !c.Readiness(at(5)).Ready {
+			t.Fatal("a CONSOLIDATED selection must make the cart ready")
+		}
+	}
+}
+
+func TestQuoteDoesNotAliasTheCallersEligibilityFlag(t *testing.T) {
+	c := withLine(t, newCart(t), "item-a", 1)
+	_ = c.SetDestination("787", at(2))
+	flag := true
+	o := offer("o1", 1, TierConsolidated, at(30))
+	o.ConsolidationEligible = &flag
+	q := DeliveryQuote{QuotedAt: at(3), Groups: []QuoteGroup{{GroupNo: 1, LineNos: []int{1}, Offers: []QuotedOffer{o}}}}
+	if err := c.QuoteDelivery(q, at(3)); err != nil {
+		t.Fatal(err)
+	}
+	flag = false
+	if got := c.Quote().Groups[0].Offers[0].ConsolidationEligible; got == nil || !*got {
+		t.Fatalf("the held offer changed with the caller's flag: %v", got)
+	}
+}
+
+func TestConsolidatedOfferFieldsAreValidated(t *testing.T) {
+	cases := map[string]func(o *QuotedOffer){
+		"eligible on a classic tier": func(o *QuotedOffer) { o.Tier = TierStandard },
+		"unknown band":               func(o *QuotedOffer) { o.CapacityBand = "FULL" },
+	}
+	for name, mutate := range cases {
+		o := offer("o1", 1, TierConsolidated, at(9))
+		o.ConsolidationEligible = boolPtr(true)
+		mutate(&o)
+		if err := o.validate(); err == nil {
+			t.Fatalf("%s: must be refused", name)
+		}
+	}
+	for name, o := range map[string]QuotedOffer{
+		"consolidated, no extras":      offer("o1", 1, TierConsolidated, at(9)),
+		"consolidated, eligible false": {OfferID: "o1", GroupNo: 1, Tier: TierConsolidated, DeliverByEarliest: "2026-10-27", DeliverByLatest: "2026-10-28", ExpiresAt: at(9), ConsolidationEligible: boolPtr(false)},
+		"classic with a band":          {OfferID: "o1", GroupNo: 1, Tier: TierNextDay, DeliverByEarliest: "2026-10-27", DeliverByLatest: "2026-10-28", ExpiresAt: at(9), CapacityBand: BandAmple},
+	} {
+		if err := o.validate(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+}
+
+func TestAnUnavailableConsolidatedTierIsAKnownTier(t *testing.T) {
+	c := withLine(t, newCart(t), "item-a", 1)
+	_ = c.SetDestination("787", at(2))
+	q := DeliveryQuote{QuotedAt: at(3), Unavailable: []TierUnavailable{{Tier: TierConsolidated, Constraint: "NO_WAVE"}}}
+	if err := c.QuoteDelivery(q, at(3)); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestRequotedConsolidatedOfferIsSelectedWithItsFields(t *testing.T) {
+	c := quoted(t)
+	o := offer("re-1", 1, TierConsolidated, at(30))
+	o.ConsolidationEligible, o.CapacityBand = boolPtr(true), BandAmple
+	if err := c.AcceptRequotedOffers([]QuotedOffer{o}, at(6)); err != nil {
+		t.Fatal(err)
+	}
+	got := c.Quote().Groups[0].Offers[0]
+	if got.Tier != TierConsolidated || got.ConsolidationEligible == nil || !*got.ConsolidationEligible || got.CapacityBand != BandAmple {
+		t.Fatalf("%+v", got)
+	}
+	bad := offer("re-2", 1, TierStandard, at(30))
+	bad.ConsolidationEligible = boolPtr(true)
+	if err := c.AcceptRequotedOffers([]QuotedOffer{bad}, at(7)); err == nil {
+		t.Fatal("eligibility on a classic tier must be refused")
 	}
 }

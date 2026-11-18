@@ -152,6 +152,24 @@ func asMap(t *testing.T, v any) map[string]any {
 	return m
 }
 
+// keysOfAll is one object holding every key any element of the array carries:
+// an optional property (capacityBand, consolidationEligible) is absent from the
+// offers that have none, and must still be declared by the schema.
+func keysOfAll(t *testing.T, v any) map[string]any {
+	t.Helper()
+	list, ok := v.([]any)
+	if !ok || len(list) == 0 {
+		t.Fatalf("%v is not a non-empty array", v)
+	}
+	out := map[string]any{}
+	for _, e := range list {
+		for k, val := range asMap(t, e) {
+			out[k] = val
+		}
+	}
+	return out
+}
+
 func first(t *testing.T, v any) any {
 	t.Helper()
 	list, ok := v.([]any)
@@ -181,7 +199,7 @@ func TestAnsweredObjectsCarryExactlyTheOpenAPIProperties(t *testing.T) {
 		"DeliverySelection": asMap(t, first(t, cartDoc["selections"])),
 		"DeliveryQuote":     quote,
 		"QuoteGroup":        group,
-		"QuotedOffer":       asMap(t, first(t, group["offers"])),
+		"QuotedOffer":       keysOfAll(t, group["offers"]),
 		"TierUnavailable":   asMap(t, first(t, quote["unavailable"])),
 	} {
 		if got, want := sortedKeys(obj), openAPIProps(t, schema); !reflect.DeepEqual(got, want) {

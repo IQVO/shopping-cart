@@ -116,5 +116,6 @@ func initializeScenario(sc *godog.ScenarioContext) {
 	registerCommands(sc, w)
 	registerLifecycle(sc, w)
 	registerRules(sc, w)
+	registerConsolidated(sc, w)
 	registerAssertions(sc, w)
 }

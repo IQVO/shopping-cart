@@ -85,13 +85,26 @@ func TestStateAndTierValidity(t *testing.T) {
 			t.Fatal(s)
 		}
 	}
-	for _, tr := range []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard} {
+	for _, tr := range []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard, TierConsolidated} {
 		if !tr.Valid() {
 			t.Fatal(tr)
 		}
 	}
-	if State("x").Valid() || Tier("x").Valid() {
+	if State("x").Valid() || Tier("x").Valid() || Tier("").Valid() || Tier("consolidated").Valid() {
 		t.Fatal("unknown values are invalid")
+	}
+}
+
+func TestCapacityBandValidity(t *testing.T) {
+	for _, b := range []CapacityBand{BandAmple, BandTight, BandScarce} {
+		if !b.Valid() {
+			t.Fatal(b)
+		}
+	}
+	for _, b := range []CapacityBand{"", "FULL", "ample"} {
+		if b.Valid() {
+			t.Fatalf("%q must be invalid", b)
+		}
 	}
 }
 

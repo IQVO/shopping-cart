@@ -32,7 +32,7 @@ func (g *Gateway) toQuote(resp quoteResponse, lines []cart.Line) cart.DeliveryQu
 		grp.Offers = append(grp.Offers, cart.QuotedOffer{
 			OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: cart.Tier(o.Tier),
 			DeliverByEarliest: o.Window.Earliest.In(loc).Format(cart.DateLayout), DeliverByLatest: o.Window.Latest.In(loc).Format(cart.DateLayout),
-			ExpiresAt: o.ExpiresAt.UTC(),
+			ExpiresAt: o.ExpiresAt.UTC(), ConsolidationEligible: eligibility(o), CapacityBand: band(o),
 		})
 		for _, l := range o.Lines {
 			items[o.GroupNo][l.CatalogItemID] = true
@@ -72,4 +72,24 @@ func lineNos(lines []cart.Line, items map[string]bool, only bool) []int {
 		}
 	}
 	return out
+}
+
+// eligibility keeps consolidationEligible only on the tier that defines it
+// (delivery-promise ADR 0024); an offer of another tier never carries one.
+func eligibility(o offerDTO) *bool {
+	if o.Tier != string(cart.TierConsolidated) || o.ConsolidationEligible == nil {
+		return nil
+	}
+	v := *o.ConsolidationEligible
+	return &v
+}
+
+// band keeps capacityBand when it is one this service knows. The band is a
+// signal only (ADR 0023), so a value added later is dropped rather than
+// failing the whole quote.
+func band(o offerDTO) cart.CapacityBand {
+	if b := cart.CapacityBand(o.CapacityBand); b.Valid() {
+		return b
+	}
+	return ""
 }
