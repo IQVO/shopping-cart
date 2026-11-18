@@ -21,6 +21,9 @@ type offerJSON struct {
 	DeliverByEarliest string    `json:"deliverByEarliest"`
 	DeliverByLatest   string    `json:"deliverByLatest"`
 	ExpiresAt         time.Time `json:"expiresAt"`
+	// Optional and omitted when empty: carts stored before the CONSOLIDATED tier read back unchanged.
+	ConsolidationEligible *bool  `json:"consolidationEligible,omitempty"`
+	CapacityBand          string `json:"capacityBand,omitempty"`
 }
 
 type groupJSON struct {
@@ -95,7 +98,7 @@ func marshalQuote(q *cart.DeliveryQuote) ([]byte, error) {
 	for i, g := range q.Groups {
 		jg := groupJSON{GroupNo: g.GroupNo, LineNos: append([]int{}, g.LineNos...), Offers: make([]offerJSON, len(g.Offers))}
 		for j, o := range g.Offers {
-			jg.Offers[j] = offerJSON{o.OfferID, o.GroupNo, string(o.Tier), o.DeliverByEarliest, o.DeliverByLatest, o.ExpiresAt}
+			jg.Offers[j] = offerJSON{o.OfferID, o.GroupNo, string(o.Tier), o.DeliverByEarliest, o.DeliverByLatest, o.ExpiresAt, o.ConsolidationEligible, string(o.CapacityBand)}
 		}
 		out.Groups[i] = jg
 	}
@@ -118,7 +121,8 @@ func unmarshalQuote(b []byte) (*cart.DeliveryQuote, error) {
 		qg := cart.QuoteGroup{GroupNo: g.GroupNo, LineNos: g.LineNos}
 		for _, o := range g.Offers {
 			qg.Offers = append(qg.Offers, cart.QuotedOffer{OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: cart.Tier(o.Tier),
-				DeliverByEarliest: o.DeliverByEarliest, DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt})
+				DeliverByEarliest: o.DeliverByEarliest, DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt,
+				ConsolidationEligible: o.ConsolidationEligible, CapacityBand: cart.CapacityBand(o.CapacityBand)})
 		}
 		q.Groups = append(q.Groups, qg)
 	}

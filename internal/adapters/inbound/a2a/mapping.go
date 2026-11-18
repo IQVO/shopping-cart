@@ -103,12 +103,14 @@ type lineDTO struct {
 }
 
 type offerDTO struct {
-	OfferID           string    `json:"offerId"`
-	GroupNo           int       `json:"groupNo"`
-	Tier              string    `json:"tier"`
-	DeliverByEarliest string    `json:"deliverByEarliest"`
-	DeliverByLatest   string    `json:"deliverByLatest"`
-	ExpiresAt         time.Time `json:"expiresAt"`
+	OfferID               string    `json:"offerId"`
+	GroupNo               int       `json:"groupNo"`
+	Tier                  string    `json:"tier"`
+	DeliverByEarliest     string    `json:"deliverByEarliest"`
+	DeliverByLatest       string    `json:"deliverByLatest"`
+	ExpiresAt             time.Time `json:"expiresAt"`
+	ConsolidationEligible *bool     `json:"consolidationEligible,omitempty"`
+	CapacityBand          string    `json:"capacityBand,omitempty"`
 }
 
 type groupDTO struct {
@@ -178,7 +180,8 @@ func strPtr(s string) *string {
 
 func offerOut(o cart.QuotedOffer) offerDTO {
 	return offerDTO{OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: string(o.Tier), DeliverByEarliest: o.DeliverByEarliest,
-		DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt}
+		DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt,
+		ConsolidationEligible: o.ConsolidationEligible, CapacityBand: string(o.CapacityBand)}
 }
 
 func quoteOut(q *cart.DeliveryQuote) *quoteDTO {

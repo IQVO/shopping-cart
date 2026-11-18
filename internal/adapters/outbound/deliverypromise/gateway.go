@@ -98,6 +98,10 @@ type offerDTO struct {
 	Window    windowDTO `json:"window"`
 	QuotedAt  time.Time `json:"quotedAt"`
 	ExpiresAt time.Time `json:"expiresAt"`
+	// Optional in delivery-promise's DeliveryOffer: capacityBand (ADR 0023), and
+	// consolidationEligible (ADR 0024) for the tier CONSOLIDATED only.
+	ConsolidationEligible *bool  `json:"consolidationEligible"`
+	CapacityBand          string `json:"capacityBand"`
 }
 
 type unavailableDTO struct {

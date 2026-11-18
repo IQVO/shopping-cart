@@ -72,6 +72,15 @@
                     "items": {
                       "additionalProperties": false,
                       "properties": {
+                        "capacityBand": {
+                          "type": "string"
+                        },
+                        "consolidationEligible": {
+                          "type": [
+                            "null",
+                            "boolean"
+                          ]
+                        },
                         "deliverByEarliest": {
                           "type": "string"
                         },
@@ -362,6 +371,15 @@
                           "items": {
                             "additionalProperties": false,
                             "properties": {
+                              "capacityBand": {
+                                "type": "string"
+                              },
+                              "consolidationEligible": {
+                                "type": [
+                                  "null",
+                                  "boolean"
+                                ]
+                              },
                               "deliverByEarliest": {
                                 "type": "string"
                               },

@@ -20,12 +20,14 @@ type lineView struct {
 }
 
 type offerView struct {
-	OfferID           string    `json:"offerId"`
-	GroupNo           int       `json:"groupNo"`
-	Tier              string    `json:"tier"`
-	DeliverByEarliest string    `json:"deliverByEarliest"`
-	DeliverByLatest   string    `json:"deliverByLatest"`
-	ExpiresAt         time.Time `json:"expiresAt"`
+	OfferID               string    `json:"offerId"`
+	GroupNo               int       `json:"groupNo"`
+	Tier                  string    `json:"tier"`
+	DeliverByEarliest     string    `json:"deliverByEarliest"`
+	DeliverByLatest       string    `json:"deliverByLatest"`
+	ExpiresAt             time.Time `json:"expiresAt"`
+	ConsolidationEligible *bool     `json:"consolidationEligible,omitempty"`
+	CapacityBand          string    `json:"capacityBand,omitempty"`
 }
 
 type groupView struct {
@@ -102,6 +104,7 @@ func toOffer(o cart.QuotedOffer) offerView {
 	return offerView{
 		OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: string(o.Tier),
 		DeliverByEarliest: o.DeliverByEarliest, DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt,
+		ConsolidationEligible: o.ConsolidationEligible, CapacityBand: string(o.CapacityBand),
 	}
 }
 

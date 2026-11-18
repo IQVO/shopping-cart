@@ -76,6 +76,8 @@ func TestPoisonPayloadsAreValidationErrors(t *testing.T) {
 		c.ApplyItemPriceWithdrawn(ctx, m, usecases.ItemPriceWithdrawn{CatalogItemID: "a"}),
 		c.ApplyDeliveryChargeScheduleChanged(ctx, m, usecases.DeliveryChargeScheduleChanged{Version: 1}),
 		c.ApplyDeliveryChargeScheduleChanged(ctx, m, usecases.DeliveryChargeScheduleChanged{Version: 1, Tiers: []usecases.TierCharge{{Tier: "FAST"}}}),
+		// the pricing contract names the four classic tiers only
+		c.ApplyDeliveryChargeScheduleChanged(ctx, m, usecases.DeliveryChargeScheduleChanged{Version: 1, Tiers: []usecases.TierCharge{{Tier: "CONSOLIDATED"}}}),
 		c.ApplyTaxTableChanged(ctx, m, usecases.TaxTableChanged{Version: 1}),
 		c.ApplyTaxTableChanged(ctx, m, usecases.TaxTableChanged{Version: 1, Bands: []usecases.TaxBand{{PostalPrefixFrom: "9", PostalPrefixTo: "1"}}}),
 		c.ApplyCheckoutCompleted(ctx, m, usecases.CheckoutCompleted{CartID: "c"}),

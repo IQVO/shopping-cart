@@ -55,7 +55,13 @@ security scheme. Every Kafka message is CloudEvents 1.0 in structured mode
   ([ADR 0007](/docs/adr/0007-delivery-dates-in-the-destinations-local-calendar));
   `expiresAt` is stored in UTC; `unavailable` tiers keep their constraint and
   group; a group's line numbers are the cart lines whose item the group's offers
-  carry.
+  carry. An offer's optional `capacityBand` (delivery-promise ADR 0023) is kept when
+  it is `AMPLE`, `TIGHT` or `SCARCE` (an unknown value is dropped, it is a signal
+  only) and `consolidationEligible` (ADR 0024) is kept for the tier `CONSOLIDATED`
+  only. The cart's own request never asks for `CONSOLIDATED`: it quotes the four
+  classic tiers, and a `CONSOLIDATED` offer reaches the cart through
+  `POST /carts/{cartId}/delivery-requote-acceptances`
+  ([ADR 0010](/docs/adr/0010-accept-the-consolidated-tier-and-the-capacity-band)).
 - **Failure:** `ports.ErrDeliveryPromiseUnavailable` (transport, timeout, 5xx,
   undecodable) and `ports.ErrQuoteRejected` (4xx) both answer `503`
   `delivery-promise-unavailable`. The call runs outside any transaction, so the

@@ -93,10 +93,13 @@ func fullCart(t *testing.T, id string) *cart.Cart {
 	offer := func(id string, g int, tier cart.Tier) cart.QuotedOffer {
 		return cart.QuotedOffer{OfferID: id, GroupNo: g, Tier: tier, DeliverByEarliest: "2026-10-27", DeliverByLatest: "2026-10-28", ExpiresAt: exp}
 	}
+	eligible := true
+	consolidated := offer("o4", 2, cart.TierConsolidated) // the optional offer fields must survive a store round trip
+	consolidated.ConsolidationEligible, consolidated.CapacityBand = &eligible, cart.BandTight
 	must(t, c.QuoteDelivery(cart.DeliveryQuote{QuotedAt: at(3),
 		Groups: []cart.QuoteGroup{
 			{GroupNo: 1, LineNos: []int{1}, Offers: []cart.QuotedOffer{offer("o1", 1, cart.TierStandard), offer("o2", 1, cart.TierNextDay)}},
-			{GroupNo: 2, LineNos: []int{2}, Offers: []cart.QuotedOffer{offer("o3", 2, cart.TierStandard)}},
+			{GroupNo: 2, LineNos: []int{2}, Offers: []cart.QuotedOffer{offer("o3", 2, cart.TierStandard), consolidated}},
 		},
 		Unavailable: []cart.TierUnavailable{{Tier: cart.TierSameDay, Constraint: "PAST_ORDER_DEADLINE", GroupNo: 1}, {Tier: cart.TierTwoDay, Constraint: "DESTINATION_NOT_SERVED"}},
 	}, at(3)))
