@@ -5,6 +5,10 @@ metadata:
   name: {{ include "shopping-cart.fullname" . }}
   labels:
     {{- include "shopping-cart.labels" . | nindent 4 }}
+  {{- with include "shopping-cart.kongPluginNames" . }}
+  annotations:
+    konghq.com/plugins: {{ . | quote }}
+  {{- end }}
 spec:
   parentRefs:
     {{- range .Values.gatewayApi.parentRefs }}
