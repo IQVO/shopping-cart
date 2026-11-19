@@ -256,3 +256,18 @@ Deployment (always rendered) includes it, so a mis-set release fails
 {{- include "shopping-cart.requireGracePeriod" . -}}
 {{- include "shopping-cart.requireHttpPort" . -}}
 {{- end -}}
+
+{{/*
+Comma-joined names of this chart's enabled KongPlugins, for the
+konghq.com/plugins annotation on every HTTPRoute this chart renders.
+Empty string (annotation omitted) when none are enabled.
+*/}}
+{{- define "shopping-cart.kongPluginNames" -}}
+{{- $names := list -}}
+{{- range $name, $cfg := .Values.kongPlugins -}}
+{{- if $cfg.enabled -}}
+{{- $names = append $names (printf "%s-%s" (include "shopping-cart.fullname" $) $name) -}}
+{{- end -}}
+{{- end -}}
+{{- join "," $names -}}
+{{- end -}}
