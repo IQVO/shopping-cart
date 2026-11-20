@@ -35,11 +35,21 @@ func idempotencyOverPostgres(t *testing.T, svc *service) {
 		}
 	})
 	t.Run("concurrent requests with one key create exactly one cart", func(t *testing.T) { concurrentSameKey(t, svc) })
-	t.Run("a 4xx answer is cached and replayed byte for byte", func(t *testing.T) {
-		const path, body = "/carts/ghost-cart/lines", `{"catalogItemId":"sku-100","quantity":1}`
-		first := svc.call(t, "POST", path, "k-404", body)
-		again := svc.call(t, "POST", path, "k-404", body)
-		if first.status != http.StatusNotFound || again.status != http.StatusNotFound || again.body != first.body ||
+	t.Run("a FINAL 4xx answer is cached and replayed byte for byte", func(t *testing.T) {
+		created := svc.call(t, "POST", "/carts", "k-422-cart", `{"shopperId":"shopper-422"}`)
+		if created.status != http.StatusCreated {
+			t.Fatalf("create = %d %s", created.status, created.body)
+		}
+		cartID := created.json(t)["cartId"].(string)
+		// quantity-out-of-range is FINAL (ADR 0011): the request alone decides,
+		// so the refusal is stored and replayed. A RETRYABLE refusal (a 404 of a
+		// ghost cart, say) is not: it releases the key (idempotency_retryable_
+		// integration_test.go proves both classes through this same router).
+		const body = `{"catalogItemId":"sku-100","quantity":0}`
+		path := "/carts/" + cartID + "/lines"
+		first := svc.call(t, "POST", path, "k-422", body)
+		again := svc.call(t, "POST", path, "k-422", body)
+		if first.status != http.StatusUnprocessableEntity || again.status != http.StatusUnprocessableEntity || again.body != first.body ||
 			first.header.Get("Idempotency-Replayed") != "" || again.header.Get("Idempotency-Replayed") != "true" {
 			t.Fatalf("first = %d %s (%v), again = %d %s (%v)", first.status, first.body, first.header, again.status, again.body, again.header)
 		}

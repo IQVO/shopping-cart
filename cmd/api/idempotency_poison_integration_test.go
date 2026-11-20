@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	inboundhttp "github.com/IQVO/shopping-cart/internal/adapters/inbound/http"
 	"github.com/IQVO/shopping-cart/internal/adapters/outbound/postgres"
 	"github.com/IQVO/shopping-cart/internal/adapters/outbound/postgres/pgtx"
+	"github.com/IQVO/shopping-cart/internal/application/idempotency"
 	"github.com/IQVO/shopping-cart/internal/testing/pgtest"
 )
 
@@ -29,13 +31,10 @@ type poisonClock struct{}
 
 func (poisonClock) Now() time.Time { return time.Now() }
 
-// poisonTx simulates what a mapped domain conflict does to the middleware's
-// transaction: a statement fails on the server (a unique violation, like a lost
-// race on a unique index), the repository translates it to a typed error and
-// the handler answers 4xx, but the transaction is ABORTED from then on.
-func poisonTx(t *testing.T, r *http.Request) {
+// poisonCtx is poisonTx for a bare context (the store-level test below).
+func poisonCtx(t *testing.T, ctx context.Context) {
 	t.Helper()
-	tx, ok := pgtx.From(r.Context())
+	tx, ok := pgtx.From(ctx)
 	if !ok {
 		t.Error("the middleware did not bind a transaction into the request context")
 		return
@@ -43,11 +42,20 @@ func poisonTx(t *testing.T, r *http.Request) {
 	const dup = `INSERT INTO idempotency_keys (route, key, request_hash, status, content_type, body, created_at)
 		VALUES ('poison', 'dup', 'h', 0, '', ''::bytea, now())`
 	for range 2 {
-		if _, err := tx.Exec(r.Context(), dup); err != nil {
+		if _, err := tx.Exec(ctx, dup); err != nil {
 			return // the second insert aborts the transaction (23505)
 		}
 	}
 	t.Error("the duplicate insert did not abort the transaction")
+}
+
+// poisonTx simulates what a mapped domain conflict does to the middleware's
+// transaction: a statement fails on the server (a unique violation, like a lost
+// race on a unique index), the repository translates it to a typed error and
+// the handler answers 4xx, but the transaction is ABORTED from then on.
+func poisonTx(t *testing.T, r *http.Request) {
+	t.Helper()
+	poisonCtx(t, r.Context())
 }
 
 func poisonRequest(key string) *http.Request {
@@ -65,43 +73,43 @@ func poisonCount(t *testing.T, pool *pgxpool.Pool, sql string, args ...any) int 
 	return n
 }
 
-// TestIdempotencyA409OverAnAbortedTransactionCommitsTheOutcome: a handler that
-// loses a unique-index race answers 409, not 500, and that 409 is stored and
-// replayed; a retry with the same key never re-runs the handler.
-func TestIdempotencyA409OverAnAbortedTransactionCommitsTheOutcome(t *testing.T) {
+// TestIdempotencyAFinalRefusalOverAnAbortedTransactionIsStillStored: a domain
+// conflict that fails a statement server-side leaves the transaction ABORTED
+// while the handler answers 4xx. The store heals that transaction (ROLLBACK TO
+// SAVEPOINT discards only the handler's partial writes) and stores the refusal
+// when its class is FINAL (Record.Release false, ADR 0011): the 409 commits and
+// a retry under the same key replays it. A RETRYABLE refusal over the same
+// aborted transaction simply rolls back and releases the key, as
+// idempotency_retryable_integration_test.go proves through the real router.
+func TestIdempotencyAFinalRefusalOverAnAbortedTransactionIsStillStored(t *testing.T) {
 	pool := pgtest.NewPool(t)
+	store := postgres.NewIdempotencyStore(pool)
 	var calls atomic.Int64
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	refusal := func(ctx context.Context) (idempotency.Record, error) {
 		calls.Add(1)
-		poisonTx(t, r)
-		w.Header().Set("Content-Type", "application/problem+json")
-		w.WriteHeader(http.StatusConflict)
-		_, _ = w.Write([]byte(`{"type":"/problems/conflict","title":"Conflict","status":409}`))
-	})
-	mw := inboundhttp.RequireIdempotencyKey(postgres.NewIdempotencyStore(pool), poisonClock{})(handler)
+		poisonCtx(t, ctx)
+		// What capture.record() yields for a FINAL refusal: a 4xx, not released.
+		return idempotency.Record{Status: http.StatusConflict, ContentType: "application/problem+json",
+			Body: []byte(`{"type":"/problems/concurrent-update","title":"Conflict","status":409}`)}, nil
+	}
 
-	first := httptest.NewRecorder()
-	mw.ServeHTTP(first, poisonRequest("k-poison"))
-	if first.Code != http.StatusConflict {
-		t.Fatalf("first = %d %s, want the truthful 409", first.Code, first.Body.String())
+	rec, replayed, err := store.Do(context.Background(), "k-poison", "h", time.Now().UTC(), refusal)
+	if err != nil || replayed || rec.Status != http.StatusConflict {
+		t.Fatalf("first call: rec=%+v replayed=%v err=%v, want the truthful 409 answered fresh", rec, replayed, err)
 	}
 	if n := poisonCount(t, pool, `SELECT count(*) FROM idempotency_keys WHERE route = '' AND key = 'k-poison' AND status = 409`); n != 1 {
-		t.Fatalf("the 409 outcome was not committed (%d rows)", n)
+		t.Fatalf("the FINAL 409 outcome was not committed (%d rows)", n)
 	}
 	if n := poisonCount(t, pool, `SELECT count(*) FROM idempotency_keys WHERE route = 'poison'`); n != 0 {
 		t.Fatalf("the handler's partial write survived (%d rows)", n)
 	}
 
-	replay := httptest.NewRecorder()
-	mw.ServeHTTP(replay, poisonRequest("k-poison"))
-	if replay.Code != http.StatusConflict || replay.Header().Get(inboundhttp.ReplayedHeader) != "true" {
-		t.Fatalf("replay = %d replayed=%q, want the cached 409", replay.Code, replay.Header().Get(inboundhttp.ReplayedHeader))
-	}
-	if replay.Body.String() != first.Body.String() {
-		t.Fatalf("replay body = %s, want %s", replay.Body.String(), first.Body.String())
+	again, replayed, err := store.Do(context.Background(), "k-poison", "h", time.Now().UTC(), refusal)
+	if err != nil || !replayed || again.Status != http.StatusConflict || string(again.Body) != string(rec.Body) {
+		t.Fatalf("replay: rec=%+v replayed=%v err=%v, want the cached 409", again, replayed, err)
 	}
 	if calls.Load() != 1 {
-		t.Fatalf("handler ran %d times, want 1 (the replay must not re-run it)", calls.Load())
+		t.Fatalf("fn ran %d times, want 1 (the replay must not re-run it)", calls.Load())
 	}
 }
 
