@@ -68,10 +68,15 @@ Every cart answer is the same document (`cartBody`,
 ## Conventions in the contract
 
 - **Idempotency.** `Idempotency-Key` (1 to 128 characters) is required on all nine
-  `POST` routes: absent or longer is `400` `idempotency-key-required`. The first
-  answer below 500 for a `(route, key)` is stored for 24 hours and replayed with
-  the header `Idempotent-Replayed: true`; the same key with a different method,
-  path, query or body is `422` `idempotency-key-reused`. A 5xx is never stored.
+  `POST` routes: absent or longer is `400` `idempotency-key-required`. A 2xx answer
+  and a refusal that is FINAL for the request (ADR 0011: `malformed-request`,
+  `quantity-out-of-range`, `validation-failed`, `cart-closed`) are stored for 24
+  hours and replayed with the header `Idempotency-Replayed: true`; a RETRYABLE
+  refusal (`not-found`, `concurrent-update`, `stale-delivery-selection`,
+  `item-not-purchasable`, `too-many-lines`, `no-destination`, `merge-target`,
+  `illegal-transition`) and a 5xx are never stored: the key is released and the same
+  key runs the request again. The same key with a different method, path, query or
+  body against a stored answer is `409` `idempotency-key-reused`.
   `POST /carts/{cartId}/delivery-quotes` forwards its key to delivery-promise.
 - **Errors** are RFC 9457 `application/problem+json` with `type`
   `/problems/<slug>`. The slugs: `malformed-request`, `idempotency-key-required`,
