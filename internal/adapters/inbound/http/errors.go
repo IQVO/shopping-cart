@@ -108,7 +108,7 @@ var problemCatalogue = []catalogueEntry{
 	// The selection must name an offer of the CURRENT quote (delivery.go SelectDelivery); a re-quote replaces the quote and can bring that offer back.
 	{cart.ErrStaleDeliverySelection, conflict("stale-delivery-selection", "A selection must name an offer of the current delivery quote"), replayRetryable},
 	// The PurchasabilityView is a read model fed by offer-availability events (ADR 0003): the fact can arrive after the request.
-	{cart.ErrItemNotPurchasable, unprocessable("item-not-purchasable", "The item is not purchasable"), replayRetryable},
+	{cart.ErrItemNotPurchasable, unprocessable("item-not-purchasable", "The item is not purchasable"), replayFinal},
 	// The request's own quantity against 1..99 (lines.go): the request alone.
 	{cart.ErrQuantityOutOfRange, unprocessable("quantity-out-of-range", "Quantity must be between 1 and 99"), replayFinal},
 	// The 100-line cap counts the cart's CURRENT lines (lines.go AddLine; lifecycle.go mergedLines): remove a line and the same request passes.
@@ -122,7 +122,7 @@ var problemCatalogue = []catalogueEntry{
 	// Shares the 503 of delivery-promise-unavailable: a 5xx is never stored.
 	{ports.ErrQuoteRejected, deliveryUnavailable, replayRetryable},
 	// The optimistic-lock version guard (postgres/carts.go Save: zero affected rows) after the use case's own commandAttempts (deps.go transact).
-	{ports.ErrConcurrentUpdate, conflict("concurrent-update", "The resource was modified by another request; retry"), replayRetryable},
+	{ports.ErrConcurrentUpdate, conflict("concurrent-update", "The resource was modified by another request; retry"), replayFinal},
 	// No code path of this service raises it today; unsure, so RETRYABLE.
 	{shared.ErrIllegalTransition, conflict("illegal-transition", "The cart does not allow this change in its current state"), replayRetryable},
 	// Every raise is a value-object rule on the request's own fields (shared.Invalid: ids, the destination prefix format, the offers of a requote body).
