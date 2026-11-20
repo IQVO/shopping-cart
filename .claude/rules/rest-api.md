@@ -27,9 +27,14 @@ agent, not generated: keep it manually accurate.
 ## Conventions
 
 - Error shape: RFC 9457 `application/problem+json`, `type` = `/problems/<slug>`
-  (catalogue in `errors.go`); every POST needs an `Idempotency-Key` (missing = 400
-  `idempotency-key-required`, same key with another body = 409
-  `idempotency-key-reused`, replay marked `Idempotency-Replayed: true`); a NUL in the
-  path, query or body is a 400 before any key is recorded.
+  (catalogue in `errors.go`, each entry with its replay class, ADR 0011); every POST
+  needs an `Idempotency-Key` (missing = 400 `idempotency-key-required`, same key with
+  another body against a stored answer = 409 `idempotency-key-reused`, replay marked
+  `Idempotency-Replayed: true`). A 2xx and a FINAL refusal are stored for 24 hours; a
+  RETRYABLE refusal (not-found, concurrent-update, stale-delivery-selection,
+  item-not-purchasable, too-many-lines, no-destination, merge-target,
+  illegal-transition) and a 5xx are not stored: the key is released and the same key
+  runs the request again; a NUL in the path, query or body is a 400 before any key is
+  recorded.
 - Auth: none. Fleet-wide auth was deliberately reverted 2026-09-11; do not add
   bearer/JWT/API-key middleware (`TestNoAuthMiddlewareReintroduced`).
