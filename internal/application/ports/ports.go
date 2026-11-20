@@ -126,8 +126,9 @@ type IdempotencyStore interface {
 	// caller compares the record's RequestHash with its own. Otherwise Do claims
 	// the key and runs fn with a ctx that carries the unit of work: everything fn
 	// writes through the repositories, the outbox included, commits atomically
-	// with the record fn returns, stamped with at. A record with a status below
-	// 500 is stored (a 4xx too, so a retry is deterministic). A 5xx record, an
+	// with the record fn returns, stamped with at. A 2xx record is stored, and so
+	// is a 4xx the middleware marked FINAL or OUTCOME (ADR 0011); a record with
+	// Release set (a RETRYABLE or unclassified refusal), a 5xx record, an
 	// error or a panic rolls everything back and stores nothing, so the retry
 	// runs fn again. A concurrent Do for the same key waits for the claimant,
 	// then replays its answer (or runs fn itself when nothing was stored).

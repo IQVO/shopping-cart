@@ -81,8 +81,8 @@ func (o *Outbox) Events() []shared.Event {
 type IdempotencyStore struct{ s *Store }
 
 // Do implements ports.IdempotencyStore. Like a unit of work it holds the store
-// while fn runs, so same-key requests are serialised and a failed or 5xx fn
-// leaves no write behind.
+// while fn runs, so same-key requests are serialised and a failed, 5xx or
+// released fn leaves no write behind (ADR 0011).
 func (i *IdempotencyStore) Do(ctx context.Context, key, requestHash string, at time.Time,
 	fn func(ctx context.Context) (idempotency.Record, error),
 ) (idempotency.Record, bool, error) {
@@ -103,7 +103,7 @@ func (i *IdempotencyStore) Do(ctx context.Context, key, requestHash string, at t
 	if err != nil {
 		return idempotency.Record{}, false, err
 	}
-	if rec.Status >= http.StatusInternalServerError {
+	if rec.Release || rec.Status >= http.StatusInternalServerError {
 		return rec, false, nil
 	}
 	rec.RequestHash, rec.CreatedAt = requestHash, at
