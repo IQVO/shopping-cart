@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,7 +17,13 @@ import (
 // The replay classes over the REAL router and REAL Postgres: a RETRYABLE
 // refusal rolls the request back, key row included, so the same key retries
 // the work and is then stored and replayed like any success (the fleet rule,
-// warehouse-harness-template docs/idempotency-replay-classes.md).
+// warehouse-harness-template docs/idempotency-replay-classes.md; ADR 0011).
+//
+// These run as subtests of TestTheShippedBinaryIsWiredEndToEnd, BEFORE its
+// kafka-down readiness subtest terminates the shared broker: they need it (a
+// booted service requires Kafka). The rig boots its own service on its own
+// database with its OWN consumer groups, so it never fights the flow's
+// instances for partitions.
 
 // retryRig is a booted service plus a pool on ITS database, so the tests can
 // count key rows and install triggers from outside any request.
@@ -28,9 +35,15 @@ type retryRig struct {
 
 func newRetryRig(t *testing.T) *retryRig {
 	t.Helper()
+	brokers := kafkatest.Brokers(t)
 	dsn := pgtest.URL(t)
 	dp := fakeDeliveryPromise(t)
-	svc := boot(t, bootEnv(t, dsn, kafkatest.Brokers(t), dp))
+	env := map[string]string{
+		"DATABASE_URL": dsn, "KAFKA_BROKERS": strings.Join(brokers, ","), "DELIVERY_PROMISE_URL": dp.URL,
+		"OFFER_AVAILABILITY_CONSUMER_GROUP": "sc-retry-offers", "PRICING_CONSUMER_GROUP": "sc-retry-pricing", "CHECKOUT_CONSUMER_GROUP": "sc-retry-checkout",
+		"OUTBOX_RELAY_INTERVAL": "100ms", "SHUTDOWN_DRAIN_DELAY": "0", "LOG_LEVEL": "warn",
+	}
+	svc := boot(t, env)
 	pool, err := postgres.NewPool(context.Background(), dsn)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
@@ -78,13 +91,20 @@ func (r *retryRig) wantRefusal(t *testing.T, reply reply, status int, slug strin
 	}
 }
 
+// replayClassesOverPostgres is the real-router proof of the RETRYABLE class.
+func replayClassesOverPostgres(t *testing.T) {
+	t.Helper()
+	t.Run("a concurrent-update refusal is not stored, so its key retries", func(t *testing.T) { concurrentUpdateRefusal(t) })
+	t.Run("an item-not-purchasable refusal is not stored, so its key retries", func(t *testing.T) { itemNotPurchasableRefusal(t) })
+}
+
 // concurrent-update is RETRYABLE. The version guard of CartRepository.Save
 // (UPDATE ... WHERE version = loaded) is what a lost optimistic-lock race
 // sees, and the use case retries it commandAttempts times before answering.
 // The trigger makes every UPDATE of carts match no row, exactly that, on both
 // attempts: the refused request must leave no key row; the same key then runs
 // again once the race is gone, is stored and is replayed.
-func TestAConcurrentUpdateRefusalIsNotStoredSoItsKeyRetries(t *testing.T) {
+func concurrentUpdateRefusal(t *testing.T) {
 	r := newRetryRig(t)
 	source := r.createCart(t, "cu-src", "shopper-cu")
 	target := r.createCart(t, "cu-tgt", "shopper-cu")
@@ -133,7 +153,7 @@ func publishPurchasable(t *testing.T) {
 // offer-availability events, so the fact the request needs can arrive a moment
 // later. The refusal must leave no key row and no replay; once the event is
 // consumed the SAME key runs again, succeeds, and is then stored and replayed.
-func TestAnItemNotPurchasableRefusalIsNotStoredSoItsKeyRetries(t *testing.T) {
+func itemNotPurchasableRefusal(t *testing.T) {
 	r := newRetryRig(t)
 	cartID := r.createCart(t, "np-c", "shopper-np")
 	const key = "np-1"
