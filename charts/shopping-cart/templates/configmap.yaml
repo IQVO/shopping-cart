@@ -32,6 +32,9 @@ data:
   {{- if ne (toString .Values.config.purgeSweepInterval) "" }}
   PURGE_SWEEP_INTERVAL: {{ .Values.config.purgeSweepInterval | quote }}
   {{- end }}
+  {{- if ne (toString .Values.config.idempotencyPurgeInterval) "" }}
+  IDEMPOTENCY_PURGE_INTERVAL: {{ .Values.config.idempotencyPurgeInterval | quote }}
+  {{- end }}
   {{- if ne (toString .Values.config.outboxRelayInterval) "" }}
   OUTBOX_RELAY_INTERVAL: {{ .Values.config.outboxRelayInterval | quote }}
   {{- end }}

@@ -107,6 +107,9 @@ config:
   # PURGE_SWEEP_INTERVAL: how often the PurgeAbandonedCarts policy runs (Go
   # duration). Empty = not rendered; the binary defaults to 6h.
   purgeSweepInterval: ""
+  # IDEMPOTENCY_PURGE_INTERVAL: how often the idempotency-key retention sweep
+  # runs (Go duration). Empty = not rendered; the binary defaults to 1h.
+  idempotencyPurgeInterval: ""
   # The three consumers always run under STABLE, service-prefixed group ids
   # that come from here, never from the pod name (a rescheduled pod must
   # resume from its committed offsets). REQUIRED; the chart refuses an empty
