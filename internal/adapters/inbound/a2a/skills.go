@@ -256,6 +256,6 @@ func problemFromUseCase(ctx context.Context, skill string, err error, cartID str
 	if errors.Is(err, ports.ErrNotFound) {
 		return problemCartNotFound(cartID)
 	}
-	slog.ErrorContext(ctx, "a2a skill failed", "skill", skill, "error", err)
+	slog.ErrorContext(ctx, "a2a skill failed", "skill", logReplacer.Replace(skill), "error", logReplacer.Replace(err.Error()))
 	return problemInternal()
 }

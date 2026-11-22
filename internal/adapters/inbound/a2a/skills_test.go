@@ -91,8 +91,11 @@ func (f *fixture) seedReady(t *testing.T, quoter *memory.Quoter) {
 	offer := func(id string, tier cart.Tier) cart.QuotedOffer {
 		return cart.QuotedOffer{OfferID: id, GroupNo: 1, Tier: tier, DeliverByEarliest: "2026-10-26", DeliverByLatest: "2026-10-27", ExpiresAt: expires}
 	}
+	eligible := true
+	consolidated := offer("o3", cart.TierConsolidated)
+	consolidated.ConsolidationEligible, consolidated.CapacityBand = &eligible, cart.BandTight
 	quoter.Respond(cart.DeliveryQuote{QuotedAt: t0, Groups: []cart.QuoteGroup{{GroupNo: 1, LineNos: []int{1},
-		Offers: []cart.QuotedOffer{offer("o1", cart.TierStandard), offer("o2", cart.TierNextDay)}}},
+		Offers: []cart.QuotedOffer{offer("o1", cart.TierStandard), offer("o2", cart.TierNextDay), consolidated}}},
 		Unavailable: []cart.TierUnavailable{{Tier: cart.TierSameDay, Constraint: "PAST_ORDER_DEADLINE", GroupNo: 1}}}, nil)
 	steps := []func() error{
 		func() error { _, err := usecases.AddLine{Deps: f.full}.Execute(ctx, f.ready, "sku-1", 2); return err },
@@ -154,7 +157,10 @@ type wireCart struct {
 	DeliveryQuote *struct {
 		Groups []struct {
 			Offers []struct {
-				OfferID string `json:"offerId"`
+				OfferID               string `json:"offerId"`
+				Tier                  string `json:"tier"`
+				ConsolidationEligible *bool  `json:"consolidationEligible"`
+				CapacityBand          string `json:"capacityBand"`
 			} `json:"offers"`
 		} `json:"groups"`
 		UnavailableTiers []string `json:"unavailableTiers"`
@@ -286,8 +292,16 @@ func assertReadyCartContent(t *testing.T, c wireCart, id string) {
 func assertReadyCartQuote(t *testing.T, c wireCart) {
 	t.Helper()
 	q := c.DeliveryQuote
-	if q == nil || len(q.Groups) != 1 || len(q.Groups[0].Offers) != 2 || len(q.UnavailableTiers) != 1 || q.UnavailableTiers[0] != "SAME_DAY" {
+	if q == nil || len(q.Groups) != 1 || len(q.Groups[0].Offers) != 3 || len(q.UnavailableTiers) != 1 || q.UnavailableTiers[0] != "SAME_DAY" {
 		t.Fatalf("quote = %+v", q)
+	}
+	// the CONSOLIDATED offer relays its optional fields; the classic ones carry none
+	o1, o3 := q.Groups[0].Offers[0], q.Groups[0].Offers[2]
+	if o1.ConsolidationEligible != nil || o1.CapacityBand != "" {
+		t.Fatalf("a classic offer carries %+v", o1)
+	}
+	if o3.Tier != "CONSOLIDATED" || o3.ConsolidationEligible == nil || !*o3.ConsolidationEligible || o3.CapacityBand != "TIGHT" {
+		t.Fatalf("the CONSOLIDATED offer = %+v", o3)
 	}
 }
 

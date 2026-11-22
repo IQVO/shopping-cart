@@ -1,8 +1,9 @@
 // Command api is shopping-cart's composition root: it wires env config into
 // adapters, adapters into use cases, and use cases into the HTTP router, the
-// three Kafka consumers (ADR 0003), the two clock-driven policies and the
-// outbox relay, all on real Postgres and real Kafka: there is no in-memory
-// mode, no log sink and no consumer that is off.
+// three Kafka consumers (ADR 0003), the two clock-driven policies, the
+// idempotency-key retention sweep and the outbox relay, all on real Postgres
+// and real Kafka: there is no in-memory mode, no log sink and no consumer
+// that is off.
 //
 // Environment:
 //
@@ -18,6 +19,7 @@
 //	CART_CURRENCY                     estimate currency before any price is known (default USD)
 //	ABANDON_SWEEP_INTERVAL            policy AbandonInactive tick (Go duration, default 1h)
 //	PURGE_SWEEP_INTERVAL              policy PurgeAbandonedCarts tick (Go duration, default 6h)
+//	IDEMPOTENCY_PURGE_INTERVAL        idempotency-key retention sweep tick (Go duration, default 1h)
 //	OUTBOX_RELAY_INTERVAL             relay poll interval (Go duration or seconds, default 1s)
 //	OUTBOX_MAX_ATTEMPTS               failures before the relay excludes a row (default 20, 0 = unlimited)
 //	SHUTDOWN_DRAIN_DELAY              wait after flipping /readyz before closing (default 5s)
@@ -56,6 +58,7 @@ import (
 	outboxrelay "github.com/IQVO/shopping-cart/internal/adapters/outbound/outbox"
 	"github.com/IQVO/shopping-cart/internal/adapters/outbound/postgres"
 	"github.com/IQVO/shopping-cart/internal/adapters/outbound/telemetry"
+	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 	"github.com/IQVO/shopping-cart/internal/bootretry"
 )
@@ -124,7 +127,7 @@ func run(ctx context.Context) error {
 
 	consumers, closeConsumers := startConsumers(ad, rt, logger)
 	relay, closeRelay := startOutboxRelay(ad.outbox, rt.brokers, logger)
-	jobs, closeJobs := startSchedulers(ad.deps, logger)
+	jobs, closeJobs := startSchedulers(ad.deps, ad.idempotency, logger)
 	return serveUntilSignal(ctx, logger, httpServer, readiness, append(consumers, jobs...), func() { closeJobs(); closeConsumers() }, relay, closeRelay)
 }
 
@@ -356,15 +359,19 @@ func await(logger *slog.Logger, w *worker) {
 	}
 }
 
-// startSchedulers starts the two clock-driven policies: AbandonInactive and
-// PurgeAbandonedCarts (decision H5).
-func startSchedulers(d usecases.Deps, logger *slog.Logger) ([]*worker, func()) {
+// startSchedulers starts the three clock-driven jobs: the policies
+// AbandonInactive and PurgeAbandonedCarts (decision H5), and the
+// idempotency-key retention sweep PurgeExpiredIdempotencyKeys (ADR 0011,
+// addendum), which deletes the key rows the 24-hour window has retired.
+func startSchedulers(d usecases.Deps, keys ports.IdempotencyStore, logger *slog.Logger) ([]*worker, func()) {
 	ctx, stop := context.WithCancel(context.Background())
 	jobs := []scheduler.Job{
 		{Name: "AbandonInactive", Sweep: usecases.AbandonInactive{Deps: d}, Log: logger,
 			Interval: parseInterval("ABANDON_SWEEP_INTERVAL", os.Getenv("ABANDON_SWEEP_INTERVAL"), scheduler.DefaultAbandonInterval, logger)},
 		{Name: "PurgeAbandonedCarts", Sweep: usecases.PurgeAbandonedCarts{Deps: d}, Log: logger,
 			Interval: parseInterval("PURGE_SWEEP_INTERVAL", os.Getenv("PURGE_SWEEP_INTERVAL"), scheduler.DefaultPurgeInterval, logger)},
+		{Name: "PurgeExpiredIdempotencyKeys", Sweep: usecases.PurgeExpiredIdempotencyKeys{Store: keys}, Log: logger,
+			Interval: parseInterval("IDEMPOTENCY_PURGE_INTERVAL", os.Getenv("IDEMPOTENCY_PURGE_INTERVAL"), scheduler.DefaultIdempotencyPurgeInterval, logger)},
 	}
 	workers := make([]*worker, 0, len(jobs))
 	for _, job := range jobs {

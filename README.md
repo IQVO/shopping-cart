@@ -150,6 +150,7 @@ answers a metadata request; `/healthz` is liveness only.
 | `CART_CURRENCY` | `USD` | Estimate currency before any price is known |
 | `ABANDON_SWEEP_INTERVAL` | `1h` | Policy AbandonInactive tick (Go duration) |
 | `PURGE_SWEEP_INTERVAL` | `6h` | Policy PurgeAbandonedCarts tick (Go duration) |
+| `IDEMPOTENCY_PURGE_INTERVAL` | `1h` | Idempotency-key retention sweep tick (Go duration): rows older than the 24-hour TTL are deleted |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Relay poll interval (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row (`0` = unlimited) |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait after flipping `/readyz` before closing |
@@ -195,8 +196,14 @@ are RFC 9457 problem details (`application/problem+json`) whose `type` is
 `/problems/<slug>`. Every `POST` takes an `Idempotency-Key` header (1 to 128
 printable ASCII characters, one fresh UUID per logical submit): a retry with the
 same key and the same request replays the first response with
-`Idempotency-Replayed: true`, the same key with another request is
-`409 idempotency-key-reused`, no key is `400 idempotency-key-required`. `PUT` and
+`Idempotency-Replayed: true`; a 2xx and a refusal that is final for the
+request (ADR 0011: malformed-request, quantity-out-of-range, validation-failed,
+cart-closed) are stored for 24 hours, a retryable refusal (not-found,
+concurrent-update, stale-delivery-selection, item-not-purchasable, too-many-lines,
+no-destination, merge-target, illegal-transition) and a 5xx release the key so the
+same key runs the request again, the same key with another request against a stored
+answer is `409 idempotency-key-reused`, no key is `400 idempotency-key-required`.
+`PUT` and
 `DELETE` are idempotent by method and need no key. `GET /carts` is keyset-paged:
 `limit` (1 to 500, default 100) and `cursor`, answered as
 `{"items": [...], "nextCursor": "..."}` (`nextCursor` is absent on the last page;

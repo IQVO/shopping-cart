@@ -15,11 +15,31 @@ const (
 	TierNextDay  Tier = "NEXT_DAY"
 	TierTwoDay   Tier = "TWO_DAY"
 	TierStandard Tier = "STANDARD"
+	// TierConsolidated is delivery-promise's opt-in tier of a customer-chosen
+	// delivery day (its ADR 0024). A quote carries it only when the caller asked.
+	TierConsolidated Tier = "CONSOLIDATED"
 )
 
-// Valid reports whether t is one of the four tiers.
+// Valid reports whether t is one of the five tiers.
 func (t Tier) Valid() bool {
-	return t == TierSameDay || t == TierNextDay || t == TierTwoDay || t == TierStandard
+	return t == TierSameDay || t == TierNextDay || t == TierTwoDay || t == TierStandard || t == TierConsolidated
+}
+
+// CapacityBand is delivery-promise's quote-time reading of the capacity
+// pressure on an offer's window (its ADR 0023). A signal only: it changes no
+// offer, window or order, and the network computes no fee from it.
+type CapacityBand string
+
+// The bands.
+const (
+	BandAmple  CapacityBand = "AMPLE"
+	BandTight  CapacityBand = "TIGHT"
+	BandScarce CapacityBand = "SCARCE"
+)
+
+// Valid reports whether b is one of the three bands.
+func (b CapacityBand) Valid() bool {
+	return b == BandAmple || b == BandTight || b == BandScarce
 }
 
 // DateLayout is the layout of the delivery-by dates (calendar dates).
@@ -27,13 +47,19 @@ const DateLayout = "2006-01-02"
 
 // QuotedOffer is one offer delivery-promise returned. A quote holds no
 // capacity: the offer is only something the shopper may select.
+//
+// ConsolidationEligible is set only for the tier CONSOLIDATED (nil, unknown,
+// otherwise; never false by default). CapacityBand is empty when
+// delivery-promise gave none.
 type QuotedOffer struct {
-	OfferID           string
-	GroupNo           int
-	Tier              Tier
-	DeliverByEarliest string
-	DeliverByLatest   string
-	ExpiresAt         time.Time
+	OfferID               string
+	GroupNo               int
+	Tier                  Tier
+	DeliverByEarliest     string
+	DeliverByLatest       string
+	ExpiresAt             time.Time
+	ConsolidationEligible *bool
+	CapacityBand          CapacityBand
 }
 
 // QuoteGroup is one shipment group: the cart lines (1-based, cart order) it
@@ -74,6 +100,12 @@ func (o QuotedOffer) validate() error {
 	if !o.Tier.Valid() {
 		return shared.Invalid("offer %q: tier %q is unknown", o.OfferID, o.Tier)
 	}
+	if o.ConsolidationEligible != nil && o.Tier != TierConsolidated {
+		return shared.Invalid("offer %q: consolidationEligible belongs to the CONSOLIDATED tier only", o.OfferID)
+	}
+	if o.CapacityBand != "" && !o.CapacityBand.Valid() {
+		return shared.Invalid("offer %q: capacityBand %q is unknown", o.OfferID, o.CapacityBand)
+	}
 	early, err := time.Parse(DateLayout, o.DeliverByEarliest)
 	if err != nil {
 		return shared.Invalid("offer %q: deliverByEarliest must be a date", o.OfferID)
@@ -90,6 +122,10 @@ func (o QuotedOffer) validate() error {
 
 func (o QuotedOffer) normalized() QuotedOffer {
 	o.ExpiresAt = shared.UTC(o.ExpiresAt)
+	if o.ConsolidationEligible != nil {
+		v := *o.ConsolidationEligible // own the flag: the quote must not alias the caller's
+		o.ConsolidationEligible = &v
+	}
 	return o
 }
 

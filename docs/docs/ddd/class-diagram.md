@@ -10,7 +10,7 @@ description: "UML class diagrams of Shopping Cart as built: the Cart aggregate a
 UML class diagrams of the `internal/domain/**` packages as built, plus the
 hexagonal ports and adapters. Fields are unexported in Go and shown with `-`;
 methods are shown with `+`. Exported domain types: package `cart`: `ID`, `State`,
-`Line`, `Cart`, `CheckoutReadiness`, `Tier`, `QuotedOffer`, `QuoteGroup`,
+`Line`, `Cart`, `CheckoutReadiness`, `Tier`, `CapacityBand`, `QuotedOffer`, `QuoteGroup`,
 `TierUnavailable`, `DeliveryQuote`, `Selection`, `Snapshot` and the four events
 `CartLineAdded`, `CartDeliveryQuoted`, `CartAbandoned`, `CartCheckedOut`; package
 `estimate`: `TierCharge`, `Schedule`, `TaxBand`, `TaxTable`, `Group`, `Input`,
@@ -80,6 +80,8 @@ classDiagram
         +DeliverByEarliest string
         +DeliverByLatest string
         +ExpiresAt time.Time
+        +ConsolidationEligible *bool
+        +CapacityBand CapacityBand
     }
     class TierUnavailable {
         <<ValueObject>>
@@ -98,6 +100,13 @@ classDiagram
         NEXT_DAY
         TWO_DAY
         STANDARD
+        CONSOLIDATED
+    }
+    class CapacityBand {
+        <<Enumeration>>
+        AMPLE
+        TIGHT
+        SCARCE
     }
     class CheckoutReadiness {
         <<ValueObject>>
@@ -113,6 +122,7 @@ classDiagram
     DeliveryQuote *-- "0..*" TierUnavailable : unavailable
     QuoteGroup *-- "0..*" QuotedOffer : offers
     QuotedOffer --> Tier : tier
+    QuotedOffer --> CapacityBand : capacityBand
     TierUnavailable --> Tier : tier
     Cart ..> CheckoutReadiness : derives
 ```

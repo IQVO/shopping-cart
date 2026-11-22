@@ -31,8 +31,10 @@ in warehouse-docs.
 | **Cart Line** | One item with a quantity; the only line shape the cart stores. | `cart.Line{CatalogItemID, Quantity}` | A checkout session's numbered line: the session numbers lines 1..n when it opens. |
 | **Quoted Offer** | One offer held by the quote: `offerId`, `groupNo`, `tier`, delivery dates and expiry. | `cart.QuotedOffer` | The network's `DeliveryOffer` aggregate, which owns the witness path behind the window. |
 | **Shipment Group (cart)** | One group of the quote: the lines that ship together (by 1-based `LineNos`) and its offers. | `cart.QuoteGroup` | The network's shipment group in delivery-promise's `Promise`: the cart mirrors the grouping the quote returned. |
+| **Capacity Band** | `AMPLE`, `TIGHT` or `SCARCE`: delivery-promise's quote-time reading of the capacity pressure on an offer's window, optional on an offer. A signal only; it changes no offer, window or order. | `cart.CapacityBand` | A fee or a price: the network computes none. |
+| **Consolidation Eligible** | Optional boolean on a `CONSOLIDATED` offer, relayed as quoted: true when the chosen delivery day leaves the network at least one local day after the fastest window to merge the order with others. | `cart.QuotedOffer.ConsolidationEligible` | A promise that another order exists. |
 | **Tier Unavailable** | Why a tier has no offer, with a constraint and an optional group. | `cart.TierUnavailable` | A tier that was never requested. |
-| **Tier** | `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`. | `cart.Tier` | The delivery **charge** (pricing's tier charge): the tier is the promise's vocabulary, re-declared locally. |
+| **Tier** | `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD`, and the opt-in `CONSOLIDATED` ([ADR 0010](/docs/adr/0010-accept-the-consolidated-tier-and-the-capacity-band)). | `cart.Tier` | The delivery **charge** (pricing's tier charge): the tier is the promise's vocabulary, re-declared locally. |
 | **Destination Postal Prefix** | The 1 to 10 character prefix the destination resolves to; the input both the quote and the tax band key on (the tax band uses the first three characters). | `Cart.DestinationPostalPrefix`, `cart.ValidPrefix` | A ship-to address: PII that lives only in `customer-ordering`. |
 | **Cart States** | `OPEN`, `CHECKED_OUT`, `ABANDONED`, `MERGED`. | `cart.State` | The checkout session's states: a `CHECKED_OUT` cart is the effect of a completed session, not a session state. |
 | **Purchasability View** | The local, event-fed verdict of whether an item may sit in a cart: catalogued, not discontinued, priced. | table `rm_items`, `readmodel.Item.Purchasable` | `product-discovery`'s **Purchasable**: more inputs. |
@@ -51,7 +53,7 @@ in warehouse-docs.
 | Term | Definition (owner's) | Owner |
 | --- | --- | --- |
 | **DeliveryOffer** | A short-lived quote for (item, quantity, destination prefix, tier) with a delivery window, the witness path that proves it, and an expiry. | `delivery-promise` ([network](https://iqvo.github.io/warehouse-docs/network/contexts/delivery-promise)). Not to be confused with the cart's **Delivery Quote**, the set of such offers held by the cart. |
-| **Service Tier** | `SAME_DAY`, `NEXT_DAY`, `TWO_DAY` or `STANDARD`. | `delivery-promise`. |
+| **Service Tier** | `SAME_DAY`, `NEXT_DAY`, `TWO_DAY`, `STANDARD` or the opt-in `CONSOLIDATED`. | `delivery-promise`. |
 | **Effective Price** | The lowest active sale price, else the list price. | `pricing`. One of the estimate's three inputs. |
 | **Price Quote** | A binding, immutable, expiring price snapshot for one checkout. | `pricing`. Not the cart's non-binding **Estimate**. |
 | **Checkout Session** | The purchase transaction from review to placed order. | `checkout`. It reads the cart at open and closes it on completion; the cart learns of a session only at `CheckoutCompleted`. |

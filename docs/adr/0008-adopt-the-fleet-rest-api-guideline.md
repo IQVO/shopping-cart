@@ -88,3 +88,9 @@ are not collections.
   hours.
 - Keyset paging cannot skip or repeat a cart that shares a creation instant with its neighbour; the walk is
   covered by the repository contract suite (memory and Postgres) and by the HTTP tests.
+
+## Update (2026-11-20)
+
+[ADR 0011](./0011-every-problem-type-has-a-replay-class.md) narrows the sentence "A 2xx or 4xx answer is stored for 24 hours"
+of Decision 3: a 4xx is stored only when its problem type is FINAL or OUTCOME; a RETRYABLE refusal rolls back,
+key row included, and is not stored. The text above is the decision as it was taken.

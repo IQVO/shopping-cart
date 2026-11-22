@@ -1,7 +1,8 @@
 // Package scheduler is the clock-driven inbound adapter: it runs the policies
-// AbandonInactive and PurgeAbandonedCarts on a fixed interval. Each tick drains
-// its backlog in batches (a full batch means there may be more) and logs what
-// it did; a failing tick is logged and retried at the next one, never fatal.
+// AbandonInactive and PurgeAbandonedCarts, and the idempotency-key retention
+// sweep, on a fixed interval. Each tick drains its backlog in batches (a full
+// batch means there may be more) and logs what it did; a failing tick is
+// logged and retried at the next one, never fatal.
 package scheduler
 
 import (
@@ -14,7 +15,11 @@ import (
 const (
 	DefaultAbandonInterval = time.Hour
 	DefaultPurgeInterval   = 6 * time.Hour
-	DefaultBatch           = 200
+	// DefaultIdempotencyPurgeInterval is the retention tick: expiry itself is
+	// enforced on read, so the interval only bounds how long a dead
+	// idempotency_keys row stays on disk.
+	DefaultIdempotencyPurgeInterval = time.Hour
+	DefaultBatch                    = 200
 )
 
 // Sweep is one policy run: it handles up to limit carts and returns how many.
@@ -70,7 +75,7 @@ func (j Job) Run(ctx context.Context) error {
 		n, err := j.Tick(ctx)
 		switch {
 		case err != nil && ctx.Err() == nil:
-			log.ErrorContext(ctx, "scheduled sweep failed; trying again at the next tick", "job", j.Name, "handled", n, "error", err)
+			log.ErrorContext(ctx, "scheduled sweep failed; trying again at the next tick", "job", j.Name, "handled", n, "error", sanitizeErr(err))
 		case n > 0:
 			log.InfoContext(ctx, "scheduled sweep done", "job", j.Name, "handled", n)
 		}

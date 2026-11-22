@@ -84,8 +84,11 @@ func seed(t *testing.T, store *memory.Store, clock *memory.Clock, full usecases.
 	offer := func(id string, tier cart.Tier) cart.QuotedOffer {
 		return cart.QuotedOffer{OfferID: id, GroupNo: 1, Tier: tier, DeliverByEarliest: "2026-10-26", DeliverByLatest: "2026-10-27", ExpiresAt: expires}
 	}
+	eligible := true
+	consolidated := offer("o3", cart.TierConsolidated)
+	consolidated.ConsolidationEligible, consolidated.CapacityBand = &eligible, cart.BandTight
 	quoter.Respond(cart.DeliveryQuote{QuotedAt: t0, Groups: []cart.QuoteGroup{{GroupNo: 1, LineNos: []int{1},
-		Offers: []cart.QuotedOffer{offer("o1", cart.TierStandard), offer("o2", cart.TierNextDay)}}},
+		Offers: []cart.QuotedOffer{offer("o1", cart.TierStandard), offer("o2", cart.TierNextDay), consolidated}}},
 		Unavailable: []cart.TierUnavailable{{Tier: cart.TierSameDay, Constraint: "PAST_ORDER_DEADLINE", GroupNo: 1}}}, nil)
 	_, err = usecases.AddLine{Deps: full}.Execute(ctx, w.ready, "sku-1", 2)
 	must(t, err)

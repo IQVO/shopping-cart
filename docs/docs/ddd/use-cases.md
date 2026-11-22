@@ -47,9 +47,12 @@ never hold a rule. The step-by-step flows are on
   attempt once on fresh state (`commandAttempts = 2`), then the REST adapter
   answers `409` `concurrent-update`.
 - **Idempotency.** Every `POST` route requires an `Idempotency-Key` header of 1
-  to 128 characters. The first response below 500 for a `(route, key)` is stored
-  for 24 hours and replayed with `Idempotent-Replayed: true`; the same key with a
-  different request is `422` `idempotency-key-reused`; a 5xx is never stored.
+  to 128 printable ASCII characters (absent is `400` `idempotency-key-required`,
+  malformed or over 128 characters is `400` `idempotency-key-invalid`). The first
+  response below 500 for a key is stored for 24 hours and replayed with
+  `Idempotency-Replayed: true`; the same key with a different method, path or body
+  (another route included) is `409` `idempotency-key-reused`; a 5xx is never
+  stored.
 - **Ids.** A `cartId`, `shopperId`, `catalogItemId` or `offerId` is an opaque id
   of 1 to 64 characters from `A-Z a-z 0-9 . _ : -`, starting with a letter or a
   digit (`shared.ValidID`). A request path identifier longer than 128 characters
@@ -128,8 +131,11 @@ never hold a rule. The step-by-step flows are on
 - **Invariants on the quote:** group numbers start at 1 and are unique; line
   numbers lie within the cart's lines and belong to one group; each offer belongs
   to its group, has a valid id, a known tier (`SAME_DAY`, `NEXT_DAY`, `TWO_DAY`,
-  `STANDARD`), two dates (`deliverByEarliest` not after `deliverByLatest`) and an
-  `expiresAt`. A quote holds no capacity.
+  `STANDARD`, `CONSOLIDATED`), two dates (`deliverByEarliest` not after
+  `deliverByLatest`) and an `expiresAt`. An offer may carry a `capacityBand`
+  (`AMPLE`, `TIGHT`, `SCARCE`) and, for `CONSOLIDATED` only, `consolidationEligible`
+  ([ADR 0010](/docs/adr/0010-accept-the-consolidated-tier-and-the-capacity-band)).
+  A quote holds no capacity.
 - **Effect:** the quote replaces any previous one; the selections are cleared.
 - **Events:** `CartDeliveryQuoted` (destination prefix and group count; no offer
   detail).

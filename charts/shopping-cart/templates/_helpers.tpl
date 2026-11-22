@@ -80,6 +80,15 @@ Fully qualified name of the A2A agent Deployment/Service (<release>-a2a, ADR 000
 {{- include "shopping-cart.fullname" . }}-a2a
 {{- end }}
 
+{{/* agents.colocate (warehouse-infra ADR 0012): "true" iff colocate, mcp and a2a are all on; else empty. */}}
+{{- define "shopping-cart.agentsColocated" -}}
+{{- if and (.Values.agents | default dict).colocate .Values.mcp.enabled .Values.a2a.enabled }}true{{ end -}}
+{{- end }}
+
+{{- define "shopping-cart.agentsFullname" -}}
+{{- printf "%s-agents" (include "shopping-cart.fullname" .) | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
 {{/*
 Fully qualified name of the MCP server Deployment/Service (<release>-mcp, ADR 0009).
 */}}
@@ -142,7 +151,7 @@ service has no mode: Postgres and Kafka are the only runtime), no
 the chart renders itself (the same variable is never set twice).
 */}}
 {{- define "shopping-cart.requireCleanExtraEnv" -}}
-{{- $owned := list "HTTP_ADDR" "LOG_LEVEL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "DELIVERY_PROMISE_URL" "DELIVERY_PROMISE_TIMEOUT" "CART_CURRENCY" "ABANDON_SWEEP_INTERVAL" "PURGE_SWEEP_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "OFFER_AVAILABILITY_CONSUMER_GROUP" "PRICING_CONSUMER_GROUP" "CHECKOUT_CONSUMER_GROUP" -}}
+{{- $owned := list "HTTP_ADDR" "LOG_LEVEL" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "KAFKA_BROKERS" "DELIVERY_PROMISE_URL" "DELIVERY_PROMISE_TIMEOUT" "CART_CURRENCY" "ABANDON_SWEEP_INTERVAL" "PURGE_SWEEP_INTERVAL" "IDEMPOTENCY_PURGE_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" "OFFER_AVAILABILITY_CONSUMER_GROUP" "PRICING_CONSUMER_GROUP" "CHECKOUT_CONSUMER_GROUP" -}}
 {{- range .Values.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}
@@ -217,7 +226,7 @@ same variable is never set twice).
 */}}
 {{- define "shopping-cart.requireCleanMcpExtraEnv" -}}
 {{- $owned := list "MCP_ADDR" "LOG_LEVEL" "SERVICE_VERSION" "DATABASE_URL" "MIGRATIONS_DATABASE_URL" "CART_CURRENCY" "OTEL_SERVICE_NAME" "OTEL_EXPORTER_OTLP_ENDPOINT" -}}
-{{- $writeSide := list "HTTP_ADDR" "KAFKA_BROKERS" "EVENT_PUBLISHER" "DELIVERY_PROMISE_URL" "DELIVERY_PROMISE_TIMEOUT" "ABANDON_SWEEP_INTERVAL" "PURGE_SWEEP_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" -}}
+{{- $writeSide := list "HTTP_ADDR" "KAFKA_BROKERS" "EVENT_PUBLISHER" "DELIVERY_PROMISE_URL" "DELIVERY_PROMISE_TIMEOUT" "ABANDON_SWEEP_INTERVAL" "PURGE_SWEEP_INTERVAL" "IDEMPOTENCY_PURGE_INTERVAL" "OUTBOX_RELAY_INTERVAL" "OUTBOX_MAX_ATTEMPTS" "SHUTDOWN_DRAIN_DELAY" -}}
 {{- range .Values.mcp.extraEnv -}}
 {{- $name := toString .name -}}
 {{- if hasSuffix "_MODE" $name -}}
@@ -255,4 +264,19 @@ Deployment (always rendered) includes it, so a mis-set release fails
 {{- include "shopping-cart.requireCleanExtraEnv" . -}}
 {{- include "shopping-cart.requireGracePeriod" . -}}
 {{- include "shopping-cart.requireHttpPort" . -}}
+{{- end -}}
+
+{{/*
+Comma-joined names of this chart's enabled KongPlugins, for the
+konghq.com/plugins annotation on every HTTPRoute this chart renders.
+Empty string (annotation omitted) when none are enabled.
+*/}}
+{{- define "shopping-cart.kongPluginNames" -}}
+{{- $names := list -}}
+{{- range $name, $cfg := .Values.kongPlugins -}}
+{{- if $cfg.enabled -}}
+{{- $names = append $names (printf "%s-%s" (include "shopping-cart.fullname" $) $name) -}}
+{{- end -}}
+{{- end -}}
+{{- join "," $names -}}
 {{- end -}}

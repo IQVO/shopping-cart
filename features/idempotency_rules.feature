@@ -1,9 +1,13 @@
 Feature: Idempotency-Key and request validation behave as documented
-  Every POST takes a key of 1 to 128 printable ASCII characters. The first answer below
-  500 (a 4xx too) is stored for 24 hours and replayed; a 5xx is never stored. PUT and
-  DELETE are idempotent by method and take none. A key belongs to one request: reusing
-  it on another route or body is 409 idempotency-key-reused. A NUL is refused before any
-  key is recorded. (use-cases.md; openapi Idempotency-Replayed; rest-api.md conventions.)
+  Every POST takes a key of 1 to 128 printable ASCII characters. A 2xx is stored
+  for 24 hours, and so is a refusal that is final for the request (ADR 0011:
+  FINAL, e.g. quantity-out-of-range or validation-failed); a retryable refusal
+  (not-found, concurrent-update, item-not-purchasable, no-destination, ...) and
+  a 5xx are never stored: the key is released and the same key runs the request
+  again. PUT and DELETE are idempotent by method and take none. A key belongs to
+  one stored request: reusing it on another route or body is 409
+  idempotency-key-reused. A NUL is refused before any key is recorded.
+  (use-cases.md; openapi Idempotency-Replayed; rest-api.md conventions.)
 
   Background:
     Given item "sku-1" is purchasable at 1000
@@ -16,7 +20,7 @@ Feature: Idempotency-Key and request validation behave as documented
     And the problem type is "quantity-out-of-range"
     And the answer is a replay
 
-  Scenario: A stored refusal stays after its cause is fixed, a new key makes a new attempt
+  Scenario: A retryable refusal releases its key; the same key runs again once the cause is fixed
     Given delivery-promise offers "of-1" NEXT_DAY and "of-2" STANDARD for group 1 expiring in 30 minutes
     And an open cart
     And I add 1 of "sku-1"
@@ -24,11 +28,11 @@ Feature: Idempotency-Key and request validation behave as documented
     And the problem type is "no-destination"
     And I set the destination "787"
     When I quote delivery with key "q-2"
-    Then the API answers 422
-    And the problem type is "no-destination"
-    And the answer is a replay
-    When I quote delivery with key "q-3"
     Then the API answers 200
+    And the answer is not a replay
+    When I quote delivery with key "q-2"
+    Then the API answers 200
+    And the answer is a replay
 
   Scenario: A key used on another route is refused
     Given an open cart
@@ -37,14 +41,15 @@ Feature: Idempotency-Key and request validation behave as documented
     Then the API answers 409
     And the problem type is "idempotency-key-reused"
 
-  Scenario: A key used for the same request on another cart is refused, not replayed
+  Scenario: A key released by a retryable refusal is free for another request
     Given an open cart
     And a second open cart
     And I quote delivery with key "q-5"
     And the problem type is "no-destination"
     When I quote delivery of the second cart with key "q-5"
-    Then the API answers 409
-    And the problem type is "idempotency-key-reused"
+    Then the API answers 422
+    And the problem type is "no-destination"
+    And the answer is not a replay
 
   Scenario Outline: A key of <length> characters is <verdict>
     When I create a cart with a key of <length> characters

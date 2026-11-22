@@ -151,7 +151,8 @@ func (c Consumer) ApplyDeliveryChargeScheduleChanged(ctx context.Context, m Meta
 	tiers := map[cart.Tier]estimate.TierCharge{}
 	for _, t := range in.Tiers {
 		tier := cart.Tier(t.Tier)
-		if !tier.Valid() || t.ChargeMinor < 0 || t.FreeOverMinor < 0 {
+		// The pricing contract names the four classic tiers; CONSOLIDATED is not one of them.
+		if !tier.Valid() || tier == cart.TierConsolidated || t.ChargeMinor < 0 || t.FreeOverMinor < 0 {
 			return shared.Invalid("tier %q or its amounts are invalid", t.Tier)
 		}
 		tiers[tier] = estimate.TierCharge{ChargeMinor: t.ChargeMinor, FreeOverMinor: t.FreeOverMinor}

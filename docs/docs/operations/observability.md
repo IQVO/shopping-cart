@@ -96,7 +96,7 @@ dashboard filters on (`{app="shopping-cart"}`).
 | Boot | INFO | `consumer running` | `consumer` (`offer-availability consumer`, `pricing consumer`, `checkout consumer`), `topic`, `group_id`, `brokers` |
 | Boot | INFO | `outbox relay running`, `scheduler running` | `interval`, `max_attempts`, `topic` / `job`, `interval` |
 | Boot retry | WARN / INFO | `retrying` / `succeeded after retry` | `op` (`run migrations`, `ping postgres`), `attempt`, `in`, `err` |
-| Boot | WARN | `invalid ABANDON_SWEEP_INTERVAL; using the default` (and the same for `PURGE_SWEEP_INTERVAL`), `invalid OUTBOX_RELAY_INTERVAL; using the default`, `invalid OUTBOX_MAX_ATTEMPTS; using the default`, `ignoring invalid SHUTDOWN_DRAIN_DELAY` | `value`, `default` |
+| Boot | WARN | `invalid ABANDON_SWEEP_INTERVAL; using the default` (and the same for `PURGE_SWEEP_INTERVAL` and `IDEMPOTENCY_PURGE_INTERVAL`), `invalid OUTBOX_RELAY_INTERVAL; using the default`, `invalid OUTBOX_MAX_ATTEMPTS; using the default`, `ignoring invalid SHUTDOWN_DRAIN_DELAY` | `value`, `default` |
 | Boot failure | ERROR | `service exited with error` (api) / `a2a agent exited with error` (a2a) / `mcp server exited with error` (mcp); the process exits 1 | `error` |
 | Shutdown | INFO / WARN | `shutdown: readiness flipped to not-ready; waiting for traffic to drain` / `worker did not stop before the shutdown drain deadline` / `telemetry flush failed on shutdown` | `drain_delay` / `worker` / `error` |
 | Worker death | ERROR | `consumer stopped`, `outbox relay stopped`, `scheduler stopped`; then the process exits with `<worker> stopped unexpectedly: exiting so the orchestrator restarts the service` | `consumer` / `job`, `error` |
@@ -110,7 +110,7 @@ dashboard filters on (`{app="shopping-cart"}`).
 | Domain | WARN | `CheckoutCompleted names an unknown cart`, `CheckoutCompleted for a cart that is not open` (acknowledged, nothing changes) | `cartId` (`state` for the second) |
 | Relay | ERROR | `outbox relay pass failed` | `error` (starts `outbox row <id> (<type>):`) |
 | Relay | ERROR | `outbox relay: row reached the attempt cap and is excluded from future claims; re-arm it with attempts = 0 after fixing the cause` | `outbox_id`, `topic`, `event_type`, `key`, `attempts`, `error` |
-| Sweepers | INFO / ERROR | `scheduled sweep done` / `scheduled sweep failed; trying again at the next tick` | `job` (`AbandonInactive`, `PurgeAbandonedCarts`), `handled`, `error` |
+| Sweepers | INFO / ERROR | `scheduled sweep done` / `scheduled sweep failed; trying again at the next tick` | `job` (`AbandonInactive`, `PurgeAbandonedCarts`, `PurgeExpiredIdempotencyKeys`), `handled`, `error` |
 | Readiness | WARN | `readiness: dependency is not ready` (at most one round per 3 s) | `dependency` (`postgres` or `kafka`), `error` |
 | Delivery quote | WARN | `delivery window time zone unusable; delivery dates fall back to UTC` (once per distinct zone name, ADR 0007) | `timeZone`, `reason` |
 | A2A | ERROR | `a2a skill failed` (an unrecognised error, answered as a 500 problem without the cause) | `skill`, `error`, `trace_id`, `span_id` |

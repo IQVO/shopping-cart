@@ -6,10 +6,11 @@ Go module `github.com/IQVO/shopping-cart`). It holds a shopper's intent: cart
 lines, the destination postal prefix, the delivery quote delivery-promise
 returned for the cart (per shipment group, with offers and expiry), the tier
 selection per group, and a labelled, non-binding estimate (effective prices +
-selected tier charges + tax band). It owns the `Cart` aggregate and ships two
+selected tier charges + tax band). It owns the `Cart` aggregate and ships three
 binaries: `cmd/api` (REST, the outbox relay, three consumers and the
-AbandonInactive / PurgeAbandonedCarts policies in one process) and `cmd/a2a`
-(read-only Agent2Agent agent, ADR 0006).
+AbandonInactive / PurgeAbandonedCarts policies in one process), `cmd/a2a`
+(read-only Agent2Agent agent, ADR 0006) and `cmd/mcp` (read-only MCP server,
+`:8090`, tools `get_cart` and `list_shopper_carts`, authority L1, ADR 0009).
 
 ## Hard rules (each one is fitness-tested or decided in an ADR)
 

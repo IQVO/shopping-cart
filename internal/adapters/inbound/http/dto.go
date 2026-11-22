@@ -43,6 +43,9 @@ type offerBody struct {
 	DeliverByEarliest string    `json:"deliverByEarliest"`
 	DeliverByLatest   string    `json:"deliverByLatest"`
 	ExpiresAt         time.Time `json:"expiresAt"`
+	// Optional: absent for every offer that has neither (existing offers stay byte-identical).
+	ConsolidationEligible *bool  `json:"consolidationEligible,omitempty"`
+	CapacityBand          string `json:"capacityBand,omitempty"`
 }
 
 type requoteRequest struct {
@@ -110,12 +113,14 @@ func strPtr(s string) *string {
 
 func offerOut(o cart.QuotedOffer) offerBody {
 	return offerBody{OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: string(o.Tier), DeliverByEarliest: o.DeliverByEarliest,
-		DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt}
+		DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt,
+		ConsolidationEligible: o.ConsolidationEligible, CapacityBand: string(o.CapacityBand)}
 }
 
 func (o offerBody) domain() cart.QuotedOffer {
 	return cart.QuotedOffer{OfferID: o.OfferID, GroupNo: o.GroupNo, Tier: cart.Tier(o.Tier), DeliverByEarliest: o.DeliverByEarliest,
-		DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt}
+		DeliverByLatest: o.DeliverByLatest, ExpiresAt: o.ExpiresAt,
+		ConsolidationEligible: o.ConsolidationEligible, CapacityBand: cart.CapacityBand(o.CapacityBand)}
 }
 
 func quoteOut(q *cart.DeliveryQuote) *quoteBody {

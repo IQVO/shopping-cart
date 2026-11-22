@@ -166,7 +166,7 @@ curl -s "localhost:8080/carts?shopperId=shopper-1&state=OPEN"
 the quote. Error documents are RFC 9457 `application/problem+json` with `type`
 `/problems/<slug>`; the slugs are listed on
 [API reference](/docs/api-reference). Retrying a `POST` with the same key and
-body replays the stored answer; the same key with another body is `422`
+body replays the stored answer; the same key with another body is `409`
 `idempotency-key-reused`.
 
 After `AddLine` the outbox holds the analytics event; the relay publishes it

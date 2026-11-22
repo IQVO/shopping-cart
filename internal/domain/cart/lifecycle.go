@@ -83,15 +83,16 @@ func (c *Cart) MergeInto(target *Cart, now time.Time) error {
 func mergedLines(into, from []Line) ([]Line, error) {
 	out := append([]Line(nil), into...)
 	for _, l := range from {
-		i := indexIn(out, l.CatalogItemID)
-		switch {
-		case i >= 0:
+		// An if-chain rather than a tagless switch: the Go cover tool does not
+		// instrument `case` expressions, which gremlins reports as NOT COVERED.
+		if i := indexIn(out, l.CatalogItemID); i >= 0 {
 			out[i].Quantity = min(out[i].Quantity+l.Quantity, MaxQuantity)
-		case len(out) >= MaxLines:
-			return nil, ErrTooManyLines
-		default:
-			out = append(out, l)
+			continue
 		}
+		if len(out) >= MaxLines {
+			return nil, ErrTooManyLines
+		}
+		out = append(out, l)
 	}
 	return out, nil
 }

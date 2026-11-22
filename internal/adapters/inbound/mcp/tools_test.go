@@ -85,6 +85,9 @@ func TestGetCart_AnswersTheRESTDocument(t *testing.T) {
 		{[]string{"lines", "0", "quantity"}, float64(2)},
 		{[]string{"selections", "0", "offerId"}, "o2"},
 		{[]string{"deliveryQuote", "groups", "0", "groupNo"}, float64(1)},
+		{[]string{"deliveryQuote", "groups", "0", "offers", "2", "tier"}, "CONSOLIDATED"},
+		{[]string{"deliveryQuote", "groups", "0", "offers", "2", "consolidationEligible"}, true},
+		{[]string{"deliveryQuote", "groups", "0", "offers", "2", "capacityBand"}, "TIGHT"},
 		{[]string{"estimate", "currency"}, "USD"},
 		{[]string{"estimate", "itemsMinor"}, float64(2000)},
 		{[]string{"estimate", "deliveryMinor"}, float64(500)},
@@ -98,6 +101,11 @@ func TestGetCart_AnswersTheRESTDocument(t *testing.T) {
 	}
 	if n := len(linesOf(t, doc)); n != 1 {
 		t.Errorf("lines = %d, want 1", n)
+	}
+	for _, f := range []string{"consolidationEligible", "capacityBand"} {
+		if v := at(doc, "deliveryQuote", "groups", "0", "offers", "0", f); v != nil {
+			t.Errorf("a classic offer carries %s = %v; it must stay absent", f, v)
+		}
 	}
 	if _, leaked := doc["lastChangedAt"]; leaked {
 		t.Error("lastChangedAt is withheld by REST and must not be exposed over MCP")

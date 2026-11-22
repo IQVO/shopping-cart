@@ -2,6 +2,7 @@ package cart
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -84,12 +85,56 @@ func TestStateAndTierValidity(t *testing.T) {
 			t.Fatal(s)
 		}
 	}
-	for _, tr := range []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard} {
+	for _, tr := range []Tier{TierSameDay, TierNextDay, TierTwoDay, TierStandard, TierConsolidated} {
 		if !tr.Valid() {
 			t.Fatal(tr)
 		}
 	}
-	if State("x").Valid() || Tier("x").Valid() {
+	if State("x").Valid() || Tier("x").Valid() || Tier("").Valid() || Tier("consolidated").Valid() {
 		t.Fatal("unknown values are invalid")
+	}
+}
+
+func TestCapacityBandValidity(t *testing.T) {
+	for _, b := range []CapacityBand{BandAmple, BandTight, BandScarce} {
+		if !b.Valid() {
+			t.Fatal(b)
+		}
+	}
+	for _, b := range []CapacityBand{"", "FULL", "ample"} {
+		if b.Valid() {
+			t.Fatalf("%q must be invalid", b)
+		}
+	}
+}
+
+func TestRestoreAcceptsTheBoundaries(t *testing.T) {
+	cases := map[string]func(s *Snapshot){
+		"version one": func(s *Snapshot) { *s = newCart(t).Snapshot() },
+		"line ceiling": func(s *Snapshot) {
+			s.Quote, s.Selections, s.Destination = nil, nil, ""
+			s.Lines = make([]Line, MaxLines)
+			for i := range s.Lines {
+				s.Lines[i] = Line{CatalogItemID: fmt.Sprintf("item-%d", i), Quantity: 1}
+			}
+		},
+	}
+	for name, mutate := range cases {
+		s := quoted(t).Snapshot()
+		mutate(&s)
+		if _, err := Restore(s); err != nil {
+			t.Fatalf("%s: got %v, want it accepted", name, err)
+		}
+	}
+	if got := newCart(t).Snapshot().Version; got != 1 {
+		t.Fatalf("a new cart is at version %d, the version-one case above assumes 1", got)
+	}
+}
+
+func TestRestoreRefusesTwoSelectionsForOneGroup(t *testing.T) {
+	s := quoted(t).Snapshot()
+	s.Selections = []Selection{{1, "o1"}, {1, "o1"}}
+	if _, err := Restore(s); !errors.Is(err, shared.ErrInvalidSnapshot) {
+		t.Fatalf("got %v, want ErrInvalidSnapshot", err)
 	}
 }

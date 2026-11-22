@@ -107,6 +107,9 @@ config:
   # PURGE_SWEEP_INTERVAL: how often the PurgeAbandonedCarts policy runs (Go
   # duration). Empty = not rendered; the binary defaults to 6h.
   purgeSweepInterval: ""
+  # IDEMPOTENCY_PURGE_INTERVAL: how often the idempotency-key retention sweep
+  # runs (Go duration). Empty = not rendered; the binary defaults to 1h.
+  idempotencyPurgeInterval: ""
   # The three consumers always run under STABLE, service-prefixed group ids
   # that come from here, never from the pod name (a rescheduled pod must
   # resume from its committed offsets). REQUIRED; the chart refuses an empty
@@ -272,6 +275,12 @@ a2a:
       cpu: 100m
       memory: 128Mi
 
+# capacity step 3 (warehouse-infra ADR 0012): true (with mcp.enabled and a2a.enabled) runs cmd/mcp and cmd/a2a as
+# two containers of one <release>-agents Deployment. Off by default; warehouse-infra switches it on.
+agents:
+  colocate: false
+  strategy: {}   # {} = k8s default (RollingUpdate); {type: Recreate} only when no surge slot is free
+
 # Room for the binary's sequential graceful shutdown (cmd/api/main.go):
 # SHUTDOWN_DRAIN_DELAY (5s) + HTTP drain (10s) + the three consumers and two
 # sweep policies awaited up to 10s each (50s) + the outbox relay (10s) = 75s
@@ -292,3 +301,18 @@ otel:
   enabled: true
   endpoint: "otel-collector.observability.svc.cluster.local:4317"
   serviceName: "shopping-cart"
+
+# Kong plugins rendered by THIS chart (kong-plugins.yaml) and attached to
+# every HTTPRoute of this chart via the konghq.com/plugins annotation. Fleet decision
+# 2026-10-13: Kong configuration belongs to the application charts, not
+# warehouse-infra Terraform. Defaults off; warehouse-infra's values switch
+# them on. NO auth plugin here, ever.
+kongPlugins:
+  cors:
+    enabled: false
+    origin: "http://localhost"
+  prometheus:
+    enabled: false
+  opentelemetry:
+    enabled: false
+    tracesEndpoint: "http://otel-collector.observability.svc.cluster.local:4318/v1/traces"

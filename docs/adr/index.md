@@ -21,4 +21,7 @@ immutable; a changed decision gets a new ADR that supersedes the old one. The
 | [0005](/docs/adr/0005-fleet-observability-standard) | Adopt the fleet observability standard (logs, metrics, traces) | Accepted (2026-10-26). |
 | [0006](/docs/adr/0006-a2a-inbound-adapter) | A2A inbound adapter (read-only agent) | Accepted (2026-10-30). |
 | [0007](/docs/adr/0007-delivery-dates-in-the-destinations-local-calendar) | Delivery dates are days of the destination's local calendar | Accepted (2026-10-30). Supersedes the "`deliverBy*` are the UTC dates of the offer window" clause of |
+| [0008](/docs/adr/0008-adopt-the-fleet-rest-api-guideline) | Adopt the fleet REST API guideline | Accepted (2026-11-01). |
 | [0009](/docs/adr/0009-read-only-mcp-server) | A read-only MCP server (authority L1, complete surface) | Accepted (2026-11-14). Adds the MCP server of Agentic Standard v2 (AS-9); amends the "no MCP" sentence of ADR 0006. |
+| [0010](/docs/adr/0010-accept-the-consolidated-tier-and-the-capacity-band) | Accept delivery-promise's CONSOLIDATED tier and carry the capacity band | Accepted (2026-11-18). Additive; extends the four-tier clause of ADR 0002. |
+| [0011](/docs/adr/0011-every-problem-type-has-a-replay-class) | Every problem type has a replay class; a retryable refusal is not stored | Accepted (2026-11-20). Narrows the stored-4xx clause of ADR 0008 (fleet decision 2026-11-18). Addendum (2026-11-22): expired key rows are purged by a bounded background sweep. |

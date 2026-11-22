@@ -46,3 +46,14 @@ func (u PurgeAbandonedCarts) Execute(ctx context.Context, limit int) (int, error
 		return u.Carts.DeleteClosedBefore(ctx, u.now().Add(-cart.IdleAfter), limit)
 	})
 }
+
+// PurgeExpiredIdempotencyKeys is the retention policy (ADR 0011, addendum):
+// stored Idempotency-Key answers older than idempotency.TTL are deleted. It
+// raises no event and changes no answer: a row past the TTL is already
+// invisible to a replay.
+type PurgeExpiredIdempotencyKeys struct{ Store ports.IdempotencyStore }
+
+// Execute deletes up to limit expired key rows and returns how many.
+func (u PurgeExpiredIdempotencyKeys) Execute(ctx context.Context, limit int) (int, error) {
+	return u.Store.PurgeExpired(ctx, limit)
+}

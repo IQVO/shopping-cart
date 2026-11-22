@@ -126,13 +126,24 @@ type IdempotencyStore interface {
 	// caller compares the record's RequestHash with its own. Otherwise Do claims
 	// the key and runs fn with a ctx that carries the unit of work: everything fn
 	// writes through the repositories, the outbox included, commits atomically
-	// with the record fn returns, stamped with at. A record with a status below
-	// 500 is stored (a 4xx too, so a retry is deterministic). A 5xx record, an
+	// with the record fn returns, stamped with at. A 2xx record is stored, and so
+	// is a 4xx the middleware marked FINAL or OUTCOME (ADR 0011); a record with
+	// Release set (a RETRYABLE or unclassified refusal), a 5xx record, an
 	// error or a panic rolls everything back and stores nothing, so the retry
 	// runs fn again. A concurrent Do for the same key waits for the claimant,
 	// then replays its answer (or runs fn itself when nothing was stored).
 	Do(ctx context.Context, key, requestHash string, at time.Time,
 		fn func(ctx context.Context) (idempotency.Record, error)) (rec idempotency.Record, replayed bool, err error)
+
+	// PurgeExpired is the retention: it deletes at most limit stored answers
+	// older than the TTL, oldest first, and returns how many it deleted (a
+	// result equal to limit means more may remain). It never deletes a row
+	// inside the TTL, never waits for a request that holds a key (Postgres
+	// locks the batch FOR UPDATE SKIP LOCKED; the memory double serialises on
+	// its mutex) and never changes what a concurrent Do answers: a row past
+	// the TTL is already invisible to Do (the read guard of readSQL), so
+	// deleting it is not observable.
+	PurgeExpired(ctx context.Context, limit int) (deleted int, err error)
 }
 
 // Clock is the service's notion of "now"; use cases stamp aggregates with it.
