@@ -3,9 +3,11 @@ package usecases_test
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/IQVO/shopping-cart/internal/application/idempotency"
 	"github.com/IQVO/shopping-cart/internal/application/ports"
 	"github.com/IQVO/shopping-cart/internal/application/usecases"
 	"github.com/IQVO/shopping-cart/internal/domain/cart"
@@ -74,5 +76,36 @@ func TestPurgeAbandonedCartsDeletesClosedCartsIdleThirtyDaysWithoutAnEvent(t *te
 	}
 	if len(e.eventNames(t)) != events {
 		t.Fatal("purge publishes no event")
+	}
+}
+
+func TestPurgeExpiredIdempotencyKeysDeletesOnlyExpiredAnswers(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	store := e.store.Idempotency()
+	put := func(key string, age time.Duration) {
+		t.Helper()
+		_, replayed, err := store.Do(ctx, key, "h", e.clock.Now().Add(-age), func(context.Context) (idempotency.Record, error) {
+			return idempotency.Record{Status: http.StatusCreated, ContentType: "text/plain", Body: []byte(key)}, nil
+		})
+		if err != nil || replayed {
+			t.Fatalf("store %s: replayed=%v err=%v", key, replayed, err)
+		}
+	}
+	put("k-old", idempotency.TTL+time.Minute)
+	put("k-live", time.Minute)
+	n, err := usecases.PurgeExpiredIdempotencyKeys{Store: store}.Execute(ctx, 10)
+	if err != nil || n != 1 {
+		t.Fatalf("purge = %d %v, want 1 (only the expired answer)", n, err)
+	}
+	// The live answer still replays (a 500 fn is never called on a replay):
+	_, replayed, err := store.Do(ctx, "k-live", "h", e.clock.Now(), func(context.Context) (idempotency.Record, error) {
+		return idempotency.Record{Status: http.StatusInternalServerError}, nil
+	})
+	if err != nil || !replayed {
+		t.Fatalf("the live answer was deleted: replayed=%v err=%v", replayed, err)
+	}
+	if n, _ := (usecases.PurgeExpiredIdempotencyKeys{Store: store}).Execute(ctx, 10); n != 0 {
+		t.Fatalf("a second sweep deleted %d", n)
 	}
 }
