@@ -111,7 +111,7 @@ func transact[T any](ctx context.Context, uow ports.UnitOfWork, attempts int, at
 
 func (d Deps) warn(ctx context.Context, msg string, args ...any) {
 	if d.Log != nil {
-		d.Log.WarnContext(ctx, msg, args...)
+		d.Log.WarnContext(ctx, msg, sanitizeArgs(args)...)
 	}
 }
 
