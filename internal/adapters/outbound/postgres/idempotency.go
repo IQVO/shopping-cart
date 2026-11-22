@@ -51,6 +51,23 @@ const readSQL = `
 	SELECT request_hash, status, content_type, body, created_at FROM idempotency_keys
 	WHERE route = '' AND key = $1 AND created_at > now() - make_interval(secs => $2)`
 
+// purgeSQL deletes the oldest expired rows. The subselect takes them FOR
+// UPDATE SKIP LOCKED, so a row another transaction holds (a claim in flight)
+// is left for a later pass instead of waited on, and the age test is repeated
+// on the DELETE itself, so a row a claim just refreshed (the take-over of an
+// expired key resets created_at) is never deleted. It takes no advisory lock:
+// an expired row is already invisible to Do, so a request holding its key
+// neither waits for the purge nor sees it.
+const purgeSQL = `
+	DELETE FROM idempotency_keys
+	WHERE (route, key) IN (
+		SELECT route, key FROM idempotency_keys
+		WHERE created_at <= now() - make_interval(secs => $1)
+		ORDER BY created_at
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED)
+	AND created_at <= now() - make_interval(secs => $1)`
+
 // Do implements ports.IdempotencyStore: the claim, fn's writes (through the
 // transaction carried by the ctx it is handed, so every unit of work joins it)
 // and the stored answer commit together.
@@ -143,4 +160,15 @@ func (s *IdempotencyStore) replay(ctx context.Context, key string) (rec idempote
 	}
 	rec.CreatedAt = rec.CreatedAt.UTC()
 	return rec, true, false, nil
+}
+
+// PurgeExpired implements ports.IdempotencyStore: the retention. At most limit
+// rows older than the TTL go, oldest first (idempotency_keys_created_idx); a
+// result equal to limit means more may remain.
+func (s *IdempotencyStore) PurgeExpired(ctx context.Context, limit int) (int, error) {
+	tag, err := s.pool.Exec(ctx, purgeSQL, ttlSeconds(), limit)
+	if err != nil {
+		return 0, fmt.Errorf("purge idempotency keys: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
 }

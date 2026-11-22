@@ -31,7 +31,8 @@ func bootEnv(t *testing.T, dsn string, brokers []string, dp *fakeDP) map[string]
 		"DATABASE_URL": dsn, "KAFKA_BROKERS": strings.Join(brokers, ","), "DELIVERY_PROMISE_URL": dp.URL,
 		"OFFER_AVAILABILITY_CONSUMER_GROUP": "sc-e2e-offers", "PRICING_CONSUMER_GROUP": "sc-e2e-pricing", "CHECKOUT_CONSUMER_GROUP": "sc-e2e-checkout",
 		"OUTBOX_RELAY_INTERVAL": "100ms", "ABANDON_SWEEP_INTERVAL": "200ms", "PURGE_SWEEP_INTERVAL": "200ms",
-		"SHUTDOWN_DRAIN_DELAY": "0", "LOG_LEVEL": "warn",
+		"IDEMPOTENCY_PURGE_INTERVAL": "200ms",
+		"SHUTDOWN_DRAIN_DELAY":       "0", "LOG_LEVEL": "warn",
 	}
 }
 
@@ -92,6 +93,7 @@ func TestTheShippedBinaryIsWiredEndToEnd(t *testing.T) {
 	t.Run("an idle cart is abandoned and later purged by the schedulers", func(t *testing.T) { idleCartLifecycle(t, svc, dsn) })
 	t.Run("the replay classes hold over the shipped binary and Postgres", func(t *testing.T) { replayClassesOverPostgres(t) })
 	t.Run("the Idempotency-Key contract holds over the shipped binary and Postgres", func(t *testing.T) { idempotencyOverPostgres(t, svc) })
+	t.Run("expired Idempotency-Key rows are purged by the retention sweep", func(t *testing.T) { idempotencyRetentionOverPostgres(t, svc, dsn) })
 	t.Run("readyz is 503 dependency-unavailable while kafka is down", func(t *testing.T) { assertKafkaDownReadiness(t, svc) })
 }
 

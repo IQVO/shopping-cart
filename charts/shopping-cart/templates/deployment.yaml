@@ -103,6 +103,11 @@ spec:
             - name: PURGE_SWEEP_INTERVAL
               value: {{ .Values.config.purgeSweepInterval | quote }}
             {{- end }}
+            {{- if ne (toString .Values.config.idempotencyPurgeInterval) "" }}
+            # How often the idempotency-key retention sweep runs (default 1h).
+            - name: IDEMPOTENCY_PURGE_INTERVAL
+              value: {{ .Values.config.idempotencyPurgeInterval | quote }}
+            {{- end }}
             {{- if ne (toString .Values.config.outboxRelayInterval) "" }}
             - name: OUTBOX_RELAY_INTERVAL
               value: {{ .Values.config.outboxRelayInterval | quote }}

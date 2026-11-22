@@ -3,6 +3,7 @@ package memory
 import (
 	"context"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/IQVO/shopping-cart/internal/application/idempotency"
@@ -110,4 +111,44 @@ func (i *IdempotencyStore) Do(ctx context.Context, key, requestHash string, at t
 	i.s.idempotency[k] = rec
 	stored = true
 	return rec, false, nil
+}
+
+// PurgeExpired implements ports.IdempotencyStore: it deletes at most limit
+// answers that are no longer replayed (older than idempotency.TTL), oldest
+// first, and returns how many. Do holds the same mutex while it runs fn, so a
+// purge that overlaps a request waits for it and then finds its answer live.
+func (i *IdempotencyStore) PurgeExpired(_ context.Context, limit int) (int, error) {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	expired := make([]string, 0, len(i.s.idempotency))
+	for k, rec := range i.s.idempotency {
+		if i.s.now().Sub(rec.CreatedAt) > idempotency.TTL {
+			expired = append(expired, k)
+		}
+	}
+	sort.Slice(expired, func(a, b int) bool {
+		return i.s.idempotency[expired[a]].CreatedAt.Before(i.s.idempotency[expired[b]].CreatedAt)
+	})
+	if len(expired) > limit {
+		expired = expired[:max(limit, 0)]
+	}
+	for _, k := range expired {
+		delete(i.s.idempotency, k)
+	}
+	return len(expired), nil
+}
+
+// Keys returns the stored keys oldest first (test support: the repocontract
+// purge suite asks which rows survived a pass).
+func (i *IdempotencyStore) Keys() []string {
+	i.s.mu.Lock()
+	defer i.s.mu.Unlock()
+	keys := make([]string, 0, len(i.s.idempotency))
+	for k := range i.s.idempotency {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(a, b int) bool {
+		return i.s.idempotency[keys[a]].CreatedAt.Before(i.s.idempotency[keys[b]].CreatedAt)
+	})
+	return keys
 }

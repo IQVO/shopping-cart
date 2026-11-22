@@ -134,6 +134,16 @@ type IdempotencyStore interface {
 	// then replays its answer (or runs fn itself when nothing was stored).
 	Do(ctx context.Context, key, requestHash string, at time.Time,
 		fn func(ctx context.Context) (idempotency.Record, error)) (rec idempotency.Record, replayed bool, err error)
+
+	// PurgeExpired is the retention: it deletes at most limit stored answers
+	// older than the TTL, oldest first, and returns how many it deleted (a
+	// result equal to limit means more may remain). It never deletes a row
+	// inside the TTL, never waits for a request that holds a key (Postgres
+	// locks the batch FOR UPDATE SKIP LOCKED; the memory double serialises on
+	// its mutex) and never changes what a concurrent Do answers: a row past
+	// the TTL is already invisible to Do (the read guard of readSQL), so
+	// deleting it is not observable.
+	PurgeExpired(ctx context.Context, limit int) (deleted int, err error)
 }
 
 // Clock is the service's notion of "now"; use cases stamp aggregates with it.

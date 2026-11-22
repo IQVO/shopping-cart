@@ -31,6 +31,25 @@ func TestPostgresHonoursTheRepositoryContract(t *testing.T) {
 				}
 				return n
 			},
+			IdempotencyKeys: func(t *testing.T) []string {
+				var keys []string
+				rows, err := pool.Query(context.Background(), `SELECT key FROM idempotency_keys ORDER BY created_at, key`)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer rows.Close()
+				for rows.Next() {
+					var k string
+					if err := rows.Scan(&k); err != nil {
+						t.Fatal(err)
+					}
+					keys = append(keys, k)
+				}
+				if err := rows.Err(); err != nil {
+					t.Fatal(err)
+				}
+				return keys
+			},
 		}
 	})
 }

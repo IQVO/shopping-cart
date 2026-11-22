@@ -6,6 +6,7 @@ Accepted (2026-11-20). Narrows the sentence "A 2xx or 4xx answer is stored for 2
 [ADR 0008](./0008-adopt-the-fleet-rest-api-guideline.md); the fleet decision is the owner's of 2026-11-18
 (warehouse-harness-template `docs/idempotency-replay-classes.md` and
 `.claude/rules/fleet/idempotency-and-outbox.md`).
+Addendum (2026-11-22): expired key rows are purged by a bounded background sweep.
 
 ## Context
 
@@ -93,12 +94,39 @@ error is `internal-error` (500): a 5xx, never stored.
 
 ## Open points
 
-- Expired `idempotency_keys` rows are purged by nothing: the 24-hour window is enforced on read only
+- ~~Expired `idempotency_keys` rows are purged by nothing: the 24-hour window is enforced on read only
   (`readSQL`). Retention is a recorded follow-up (the fleet fix shape: a bounded background sweep), not part
-  of this change.
+  of this change.~~ Addressed 2026-11-22 by the addendum below: the retention sweep ships as
+  `PurgeExpiredIdempotencyKeys`.
 - `QuoteDelivery` forwards the caller's own `Idempotency-Key` to delivery-promise's `POST /delivery-quotes`
   (`outbound/deliverypromise/gateway.go`, `usecases/quote_delivery.go`) and reuses it across its internal
   `commandAttempts`: once delivery-promise releases a RETRYABLE refusal under that key, the second internal
   attempt executes upstream instead of replaying the stored refusal. Callers of THIS service that derive a
   key (checkout reads cart state here) may retry a released refusal the same way; caller-side behaviour is
   out of scope and only reported.
+
+## Addendum (2026-11-22): retention — a bounded purge of expired key rows
+
+The Decision above is unchanged; this records the follow-up it named. Nothing deleted an expired
+`idempotency_keys` row: the 24-hour window (`idempotency.TTL`) was enforced on read only (`readSQL`) and by
+the claim take-over (`claimSQL`), so a retired row was already invisible to a replay — but it stayed on
+disk forever, and the table grew without bound.
+
+The retention is now a store-port operation ridden by the existing sweep wiring (the same fleet fix as
+order-sourcing #84 and last-mile-delivery #86):
+
+- `ports.IdempotencyStore.PurgeExpired(ctx, limit)` deletes at most `limit` rows older than the one
+  `idempotency.TTL`, oldest first (`idempotency_keys_created_idx`). Postgres selects them
+  `FOR UPDATE SKIP LOCKED` and repeats the age test on the `DELETE`, so a row a claim just refreshed is
+  never deleted and no request is ever waited on; there is no advisory lock. The memory double gives the
+  same semantics under its mutex, and the `repocontract` suite `idempotencypurge` runs against both.
+- `usecases.PurgeExpiredIdempotencyKeys` is the third `scheduler.Job` of `cmd/api` (with
+  AbandonInactive and PurgeAbandonedCarts): it purges at start and then every
+  `IDEMPOTENCY_PURGE_INTERVAL` (default 1h), in batches of `scheduler.DefaultBatch` (200), repeating
+  until a batch comes back short. A failing pass is logged and retried at the next tick — the purge is
+  idempotent and a row that outlives its TTL is never replayed, so a failure costs only disk.
+- No answer changes: an expired row is already invisible to `Do` (the read guard), so deleting it is not
+  observable. `TestExpiredIdempotencyKeyRowsArePurgedAndLiveOnesKept`,
+  `TestAReplayOfAnExpiredKeyExecutes` and the two purge race tests (a locked expired row is skipped, never
+  waited on; requests racing the purge on an expired key each answer once) pin it through the shipped
+  binary and real Postgres.

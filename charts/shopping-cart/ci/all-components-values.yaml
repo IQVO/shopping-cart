@@ -15,6 +15,7 @@ config:
   cartCurrency: "USD"
   abandonSweepInterval: "30m"
   purgeSweepInterval: "3h"
+  idempotencyPurgeInterval: "45m"
   outboxRelayInterval: "2s"
   outboxMaxAttempts: 20
   shutdownDrainDelay: "5s"

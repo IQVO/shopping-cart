@@ -32,22 +32,26 @@ type Env struct {
 	Clock ports.Clock
 	// OutboxCount returns how many events the outbox holds.
 	OutboxCount func(t *testing.T) int
+	// IdempotencyKeys returns the keys still stored, oldest first (the purge
+	// contract asks which rows survived a pass).
+	IdempotencyKeys func(t *testing.T) []string
 }
 
 // Run executes the whole suite; newEnv must return an empty Env each time.
 func Run(t *testing.T, newEnv func(t *testing.T) Env) {
 	t.Helper()
 	suites := map[string]func(*testing.T, Env){
-		"carts":         testCarts,
-		"listbyshopper": listByShopper,
-		"listpages":     listByShopperPages,
-		"listidle":      listIdle,
-		"deleteclosed":  deleteClosed,
-		"items":         testItems,
-		"estimate":      testEstimateViews,
-		"inbox":         testInbox,
-		"unitofwork":    testUnitOfWork,
-		"idempotency":   testIdempotency,
+		"carts":            testCarts,
+		"listbyshopper":    listByShopper,
+		"listpages":        listByShopperPages,
+		"listidle":         listIdle,
+		"deleteclosed":     deleteClosed,
+		"items":            testItems,
+		"estimate":         testEstimateViews,
+		"inbox":            testInbox,
+		"unitofwork":       testUnitOfWork,
+		"idempotency":      testIdempotency,
+		"idempotencypurge": testIdempotencyPurge,
 	}
 	for name, fn := range suites {
 		t.Run(name, func(t *testing.T) { fn(t, newEnv(t)) })

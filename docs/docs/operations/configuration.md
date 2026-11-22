@@ -34,6 +34,7 @@ Source: `cmd/api/main.go`, `cmd/api/config.go`, `cmd/api/telemetry.go`,
 | `CART_CURRENCY` | `USD` | no | Currency of the labelled estimate when no priced item states one. Exactly three upper-case letters, otherwise boot fails. |
 | `ABANDON_SWEEP_INTERVAL` | `1h` | no | Tick of the `AbandonInactive` policy. Invalid or non-positive values log a warning and fall back to the default. |
 | `PURGE_SWEEP_INTERVAL` | `6h` | no | Tick of the `PurgeAbandonedCarts` policy. Same fallback rule. |
+| `IDEMPOTENCY_PURGE_INTERVAL` | `1h` | no | Tick of the idempotency-key retention sweep (`PurgeExpiredIdempotencyKeys`, ADR 0011 addendum): expired `idempotency_keys` rows (older than the 24-hour TTL) are deleted in bounded batches. Same fallback rule. |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | no | Outbox relay poll interval, a Go duration or plain seconds (`2`, `0.5`). Invalid values warn and use the default. |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | no | Failures before the relay stops claiming an outbox row. `0` means unlimited; negative or unparsable values warn and use `20`. |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | no | Wait between flipping `/readyz` to 503 and closing the listener. `0` disables the wait; negative or unparsable values warn and use the default. |
