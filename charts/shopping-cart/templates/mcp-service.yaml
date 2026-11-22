@@ -10,12 +10,12 @@ spec:
   type: {{ .Values.mcp.service.type }}
   ports:
     - port: {{ .Values.mcp.service.port }}
-      targetPort: http
+      targetPort: {{ ternary "mcp" "http" (eq (include "shopping-cart.agentsColocated" .) "true") }}
       protocol: TCP
       name: http
   # component=mcp pins the Service to the mcp Deployment's pods
   # (tests/test_service_selectors.py).
   selector:
     {{- include "shopping-cart.selectorLabels" . | nindent 4 }}
-    app.kubernetes.io/component: mcp
+    app.kubernetes.io/component: {{ ternary "agents" "mcp" (eq (include "shopping-cart.agentsColocated" .) "true") }}
 {{- end }}
