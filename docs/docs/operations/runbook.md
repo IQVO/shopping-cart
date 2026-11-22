@@ -239,13 +239,20 @@ relay never blocks a shopper.
 
 ## Sweepers
 
-Two clock-driven policies run inside `cmd/api`, each ticking immediately at boot
-and then every interval, draining their backlog in batches of 200:
+Two clock-driven policies and the idempotency-key retention sweep run inside
+`cmd/api`, each ticking immediately at boot and then every interval, draining
+their backlog in batches of 200:
 
 | Policy | Interval | Effect |
 | --- | --- | --- |
 | `AbandonInactive` | `ABANDON_SWEEP_INTERVAL` (1h) | An `OPEN` cart idle for 30 days becomes `ABANDONED` and `CartAbandoned` is published |
 | `PurgeAbandonedCarts` | `PURGE_SWEEP_INTERVAL` (6h) | A cart that is no longer `OPEN` and has been idle for 30 days is deleted; no event |
+| `PurgeExpiredIdempotencyKeys` | `IDEMPOTENCY_PURGE_INTERVAL` (1h) | `idempotency_keys` rows older than the 24-hour TTL are deleted, oldest first (ADR 0011 addendum); no event, no answer changes |
+
+The retention sweep deletes at most 200 rows per statement (`FOR UPDATE SKIP
+LOCKED`, so it never waits on a request holding a key) and repeats until a batch
+comes back short; expiry itself is enforced on read, so a late sweep only costs
+disk, never correctness.
 
 A cart that changed or closed since the scan is skipped, so a second sweep or a
 second replica is harmless. A failing tick logs `scheduled sweep failed; trying

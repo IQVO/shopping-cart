@@ -150,6 +150,7 @@ answers a metadata request; `/healthz` is liveness only.
 | `CART_CURRENCY` | `USD` | Estimate currency before any price is known |
 | `ABANDON_SWEEP_INTERVAL` | `1h` | Policy AbandonInactive tick (Go duration) |
 | `PURGE_SWEEP_INTERVAL` | `6h` | Policy PurgeAbandonedCarts tick (Go duration) |
+| `IDEMPOTENCY_PURGE_INTERVAL` | `1h` | Idempotency-key retention sweep tick (Go duration): rows older than the 24-hour TTL are deleted |
 | `OUTBOX_RELAY_INTERVAL` | `1s` | Relay poll interval (Go duration or seconds) |
 | `OUTBOX_MAX_ATTEMPTS` | `20` | Failures before the relay excludes a row (`0` = unlimited) |
 | `SHUTDOWN_DRAIN_DELAY` | `5s` | Wait after flipping `/readyz` before closing |
