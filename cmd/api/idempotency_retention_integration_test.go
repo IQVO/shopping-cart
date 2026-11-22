@@ -104,6 +104,7 @@ func idempotencyRetentionOverPostgres(t *testing.T, svc *service, dsn string) {
 			if seed.status != http.StatusCreated {
 				t.Fatalf("round %d: seed = %d %s", i, seed.status, seed.body)
 			}
+			seedCarts := countCarts(t, svc, shopper)
 			pgtest.ExecOn(t, dsn, `UPDATE idempotency_keys SET created_at = now() - interval '25 hours' WHERE key = $1`, key)
 
 			var wg sync.WaitGroup
@@ -127,8 +128,10 @@ func idempotencyRetentionOverPostgres(t *testing.T, svc *service, dsn string) {
 					t.Fatalf("round %d: a request racing the purge answered %d, want 201", i, c)
 				}
 			}
-			if got := countCarts(t, svc, shopper); got != 1 {
-				t.Fatalf("round %d: %d carts for one key, want exactly 1 (one execution, the rest replay)", i, got)
+			// The expired key is a NEW request: the winner executes once more
+			// (the seed cart plus exactly one race cart), the losers replay.
+			if got := countCarts(t, svc, shopper); got != seedCarts+1 {
+				t.Fatalf("round %d: %d carts after the race (%d seeded), want exactly one more: one execution, the rest replays", i, got, seedCarts)
 			}
 		}
 	})
