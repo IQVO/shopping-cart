@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/IQVO/shopping-cart/internal/adapters/outbound/postgres"
 	"github.com/IQVO/shopping-cart/internal/testing/pgtest"
 )
@@ -20,16 +22,26 @@ import (
 // runs inside the flow test because the shared test broker is stopped at its
 // end and every later test must be Kafka-free.
 
-// countKeyRows is how many idempotency_keys rows the key has.
-func countKeyRows(t *testing.T, dsn, key string) int {
+// retentionDB is one pool on the booted service's database with the helper the
+// retention proof needs (counting key rows). ONE pool: a fresh pool per poll
+// eats the server's connection slots (SQLSTATE 53300, the first red run).
+type retentionDB struct{ pool *pgxpool.Pool }
+
+func newRetentionDB(t *testing.T, dsn string) *retentionDB {
 	t.Helper()
 	pool, err := postgres.NewPool(context.Background(), dsn)
 	if err != nil {
 		t.Fatalf("pool: %v", err)
 	}
 	t.Cleanup(pool.Close)
+	return &retentionDB{pool: pool}
+}
+
+// keyRows is how many idempotency_keys rows the key has.
+func (r *retentionDB) keyRows(t *testing.T, key string) int {
+	t.Helper()
 	var n int
-	if err := pool.QueryRow(context.Background(), `SELECT count(*) FROM idempotency_keys WHERE key = $1`, key).Scan(&n); err != nil {
+	if err := r.pool.QueryRow(context.Background(), `SELECT count(*) FROM idempotency_keys WHERE key = $1`, key).Scan(&n); err != nil {
 		t.Fatalf("count idempotency_keys: %v", err)
 	}
 	return n
@@ -40,6 +52,7 @@ func countKeyRows(t *testing.T, dsn, key string) int {
 // executes again.
 func idempotencyRetentionOverPostgres(t *testing.T, svc *service, dsn string) {
 	t.Helper()
+	db := newRetentionDB(t, dsn)
 	t.Run("expired rows are purged and live ones kept and still replay", func(t *testing.T) {
 		expired := svc.call(t, "POST", "/carts", "k-ret-old", `{"shopperId":"shopper-ret-old"}`)
 		live := svc.call(t, "POST", "/carts", "k-ret-live", `{"shopperId":"shopper-ret-live"}`)
@@ -49,9 +62,9 @@ func idempotencyRetentionOverPostgres(t *testing.T, svc *service, dsn string) {
 		pgtest.ExecOn(t, dsn, `UPDATE idempotency_keys SET created_at = now() - interval '25 hours' WHERE key = $1`, "k-ret-old")
 
 		eventually(t, 30*time.Second, "the retention sweep to delete the expired key row", func() bool {
-			return countKeyRows(t, dsn, "k-ret-old") == 0
+			return db.keyRows(t, "k-ret-old") == 0
 		})
-		if n := countKeyRows(t, dsn, "k-ret-live"); n != 1 {
+		if n := db.keyRows(t, "k-ret-live"); n != 1 {
 			t.Fatalf("live key row = %d, want 1: a row inside the TTL is never deleted", n)
 		}
 		replay := svc.call(t, "POST", "/carts", "k-ret-live", `{"shopperId":"shopper-ret-live"}`)
