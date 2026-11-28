@@ -1,0 +1,629 @@
+{
+  "apiVersion": "warehouse/mcp-primitives/v1",
+  "server": "com.retailnetwork.storefront/shopping-cart",
+  "tools": [
+    {
+      "_meta": {
+        "com.warehouse/authority": "L1"
+      },
+      "annotations": {
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "Read one cart by its cartId: the lines (catalog item and quantity), the destinationPostalPrefix, the deliveryQuote (offer groups and unavailable tiers), the shopper's selections, the labelled estimate in minor units (estimateComplete says whether every line is priced; it is a non-binding estimate) and checkoutReadiness. The same document GET /carts/{cartId} returns, for a cart of any state. shopperId is null for a guest cart. Read-only; an unknown cartId fails with not-found, a blank one with validation-failed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cartId": {
+            "type": "string",
+            "description": "the cart id, e.g. cart-123"
+          }
+        },
+        "required": [
+          "cartId"
+        ],
+        "additionalProperties": false
+      },
+      "name": "get_cart",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "cartId": {
+            "type": "string"
+          },
+          "shopperId": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "state": {
+            "type": "string"
+          },
+          "lines": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "catalogItemId": {
+                  "type": "string"
+                },
+                "quantity": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "catalogItemId",
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "destinationPostalPrefix": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "deliveryQuote": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "properties": {
+              "groups": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupNo": {
+                      "type": "integer"
+                    },
+                    "lineNos": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "integer"
+                      }
+                    },
+                    "offers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "offerId": {
+                            "type": "string"
+                          },
+                          "groupNo": {
+                            "type": "integer"
+                          },
+                          "tier": {
+                            "type": "string"
+                          },
+                          "deliverByEarliest": {
+                            "type": "string"
+                          },
+                          "deliverByLatest": {
+                            "type": "string"
+                          },
+                          "expiresAt": {
+                            "type": "string"
+                          },
+                          "consolidationEligible": {
+                            "type": [
+                              "null",
+                              "boolean"
+                            ]
+                          },
+                          "capacityBand": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "offerId",
+                          "groupNo",
+                          "tier",
+                          "deliverByEarliest",
+                          "deliverByLatest",
+                          "expiresAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "groupNo",
+                    "lineNos",
+                    "offers"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "unavailableTiers": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unavailable": {
+                "type": [
+                  "null",
+                  "array"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "tier": {
+                      "type": "string"
+                    },
+                    "constraint": {
+                      "type": "string"
+                    },
+                    "groupNo": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "tier",
+                    "constraint"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "quotedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "groups",
+              "unavailableTiers",
+              "unavailable",
+              "quotedAt"
+            ],
+            "additionalProperties": false
+          },
+          "selections": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "groupNo": {
+                  "type": "integer"
+                },
+                "offerId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "groupNo",
+                "offerId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "estimate": {
+            "type": "object",
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "itemsMinor": {
+                "type": "integer"
+              },
+              "deliveryMinor": {
+                "type": "integer"
+              },
+              "taxMinor": {
+                "type": "integer"
+              },
+              "totalMinor": {
+                "type": "integer"
+              },
+              "estimateComplete": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "currency",
+              "itemsMinor",
+              "deliveryMinor",
+              "taxMinor",
+              "totalMinor",
+              "estimateComplete"
+            ],
+            "additionalProperties": false
+          },
+          "checkoutReadiness": {
+            "type": "object",
+            "properties": {
+              "ready": {
+                "type": "boolean"
+              },
+              "allGroupsSelected": {
+                "type": "boolean"
+              },
+              "noOfferExpired": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "ready",
+              "allGroupsSelected",
+              "noOfferExpired"
+            ],
+            "additionalProperties": false
+          },
+          "version": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cartId",
+          "shopperId",
+          "state",
+          "lines",
+          "destinationPostalPrefix",
+          "selections",
+          "estimate",
+          "checkoutReadiness",
+          "version"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "_meta": {
+        "com.warehouse/authority": "L1"
+      },
+      "annotations": {
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      },
+      "description": "List the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. Answers ONE page of at most limit carts (1 to 100, default 20) and hasMore says an older cart exists; narrow with state to reach it. A shopper with no carts gets an empty list, not an error. Read-only; a missing or invalid shopperId, an unknown state or a limit out of range fails with validation-failed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shopperId": {
+            "type": "string",
+            "description": "the shopper id whose carts are listed, e.g. shopper-42"
+          },
+          "state": {
+            "type": "string",
+            "description": "optional state filter: OPEN, CHECKED_OUT, ABANDONED or MERGED; omitted means every state"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "optional page size from 1 to 100; omitted means 20"
+          }
+        },
+        "required": [
+          "shopperId"
+        ],
+        "additionalProperties": false
+      },
+      "name": "list_shopper_carts",
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "carts": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "type": "object",
+              "properties": {
+                "cartId": {
+                  "type": "string"
+                },
+                "shopperId": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "state": {
+                  "type": "string"
+                },
+                "lines": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "catalogItemId": {
+                        "type": "string"
+                      },
+                      "quantity": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "catalogItemId",
+                      "quantity"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "destinationPostalPrefix": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "deliveryQuote": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "groups": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "groupNo": {
+                            "type": "integer"
+                          },
+                          "lineNos": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "integer"
+                            }
+                          },
+                          "offers": {
+                            "type": [
+                              "null",
+                              "array"
+                            ],
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "offerId": {
+                                  "type": "string"
+                                },
+                                "groupNo": {
+                                  "type": "integer"
+                                },
+                                "tier": {
+                                  "type": "string"
+                                },
+                                "deliverByEarliest": {
+                                  "type": "string"
+                                },
+                                "deliverByLatest": {
+                                  "type": "string"
+                                },
+                                "expiresAt": {
+                                  "type": "string"
+                                },
+                                "consolidationEligible": {
+                                  "type": [
+                                    "null",
+                                    "boolean"
+                                  ]
+                                },
+                                "capacityBand": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "offerId",
+                                "groupNo",
+                                "tier",
+                                "deliverByEarliest",
+                                "deliverByLatest",
+                                "expiresAt"
+                              ],
+                              "additionalProperties": false
+                            }
+                          }
+                        },
+                        "required": [
+                          "groupNo",
+                          "lineNos",
+                          "offers"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "unavailableTiers": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "unavailable": {
+                      "type": [
+                        "null",
+                        "array"
+                      ],
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "tier": {
+                            "type": "string"
+                          },
+                          "constraint": {
+                            "type": "string"
+                          },
+                          "groupNo": {
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "tier",
+                          "constraint"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "quotedAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "groups",
+                    "unavailableTiers",
+                    "unavailable",
+                    "quotedAt"
+                  ],
+                  "additionalProperties": false
+                },
+                "selections": {
+                  "type": [
+                    "null",
+                    "array"
+                  ],
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "groupNo": {
+                        "type": "integer"
+                      },
+                      "offerId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "groupNo",
+                      "offerId"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "estimate": {
+                  "type": "object",
+                  "properties": {
+                    "currency": {
+                      "type": "string"
+                    },
+                    "itemsMinor": {
+                      "type": "integer"
+                    },
+                    "deliveryMinor": {
+                      "type": "integer"
+                    },
+                    "taxMinor": {
+                      "type": "integer"
+                    },
+                    "totalMinor": {
+                      "type": "integer"
+                    },
+                    "estimateComplete": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "currency",
+                    "itemsMinor",
+                    "deliveryMinor",
+                    "taxMinor",
+                    "totalMinor",
+                    "estimateComplete"
+                  ],
+                  "additionalProperties": false
+                },
+                "checkoutReadiness": {
+                  "type": "object",
+                  "properties": {
+                    "ready": {
+                      "type": "boolean"
+                    },
+                    "allGroupsSelected": {
+                      "type": "boolean"
+                    },
+                    "noOfferExpired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ready",
+                    "allGroupsSelected",
+                    "noOfferExpired"
+                  ],
+                  "additionalProperties": false
+                },
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "cartId",
+                "shopperId",
+                "state",
+                "lines",
+                "destinationPostalPrefix",
+                "selections",
+                "estimate",
+                "checkoutReadiness",
+                "version"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "carts",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "resources": [],
+  "resourceTemplates": [
+    {
+      "description": "One cart: its lines, destination postal prefix, delivery quote, the shopper's selections, the labelled non-binding estimate in minor units and the checkout readiness. The same document as get_cart and GET /carts/{cartId}. An unknown cart is an error.",
+      "mimeType": "application/json",
+      "name": "cart",
+      "uriTemplate": "warehouse://shopping-cart/carts/{cartId}"
+    }
+  ],
+  "prompts": [
+    {
+      "arguments": [
+        {
+          "name": "cartId",
+          "description": "the cart id to review, e.g. cart-123",
+          "required": true
+        }
+      ],
+      "description": "Operator procedure for reviewing one cart: read it, interpret the non-binding estimate and the checkout readiness, and know what to escalate to a human because nothing here can change a cart.",
+      "name": "review_cart"
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+# shopping-cart 0.1.5 (v0.1.5, 51976ab) - System Assets & Interaction Standard v0.4
+apiVersion: warehouse/system-assets/v1
+application: application.yaml
+release:
+  version: 0.1.5
+  tag: v0.1.5
+  commit: 51976abe2e6ab899bd22a4457c65033d42e7a11a
+  chart: oci://ghcr.io/iqvo/shopping-cart:0.1.5
+  images:
+  - ghcr.io/iqvo/warehouse-infra/shopping-cart:51976ab-arm64
+  drift:
+  - MCP initialize serverInfo shopping-cart-mcp@'1.0.0' != release 0.1.5 (MC-5)
+  - served A2A Agent Card version '51976ab-arm64' != release 0.1.5 (SERVICE_VERSION is rendered from the
+    image tag)
+  - cluster runs chart 'shopping-cart-0.1.0', not the released chart shopping-cart-0.1.5
+assets:
+- id: shopping-cart/openapi
+  kind: openapi
+  path: openapi/openapi.yaml
+  spec:
+    name: openapi
+    version: 3.0.3
+  version: 0.1.0
+  exposure: kong
+- id: shopping-cart/asyncapi
+  kind: asyncapi
+  path: asyncapi/asyncapi.yaml
+  spec:
+    name: asyncapi
+    version: 3.0.0
+  version: 1.0.0
+  exposure: kafka
+- id: shopping-cart/mcp
+  kind: mcp
+  documents:
+    serverCard: mcp/server-card.json
+    primitives: mcp/primitives.json
+  spec:
+    name: mcp
+    version: '2026-07-28'
+    serverCard: sep-2127
+  version: 0.1.5
+  exposure: agent-router
+- id: shopping-cart/a2a
+  kind: a2a
+  path: a2a/agent-card.json
+  spec:
+    name: a2a
+    version: 1.0.0
+  version: 0.1.5
+  exposure: agent-router
