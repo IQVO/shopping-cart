@@ -1,0 +1,64 @@
+{
+  "supportedInterfaces": [
+    {
+      "url": "http://shopping-cart-a2a.warehouse-systems.svc.cluster.local:8093/",
+      "protocolBinding": "JSONRPC",
+      "protocolVersion": "1.0"
+    }
+  ],
+  "capabilities": {
+    "pushNotifications": false,
+    "streaming": false
+  },
+  "defaultInputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "defaultOutputModes": [
+    "application/json",
+    "text/plain"
+  ],
+  "description": "Shopping Cart agent for the storefront: a read-only view of a shopper's carts. It answers what a cart holds (its lines, destination postal prefix, delivery quote, the shopper's delivery selections, the labelled non-binding cost estimate and whether the cart is ready for checkout) and which carts a shopper has. It exposes exactly what the REST GET endpoints expose, never changes a cart and never places an order.",
+  "name": "shopping-cart",
+  "provider": {
+    "organization": "IQVO",
+    "url": "https://github.com/IQVO/shopping-cart"
+  },
+  "skills": [
+    {
+      "description": "Read one cart by its cartId: lines, destinationPostalPrefix, deliveryQuote, selections, the labelled estimate (minor units, estimateComplete says whether every line is priced) and checkoutReadiness. The same document GET /carts/{cartId} returns, for a cart of any state. Answers a 404 problem when no cart has that id. Persists nothing.",
+      "examples": [
+        "{\"skill\":\"get_cart\",\"arguments\":{\"cartId\":\"cart-123\"}}"
+      ],
+      "id": "get_cart",
+      "inputModes": [
+        "application/json"
+      ],
+      "name": "Look up one cart",
+      "tags": [
+        "cart",
+        "read",
+        "authority:L1"
+      ]
+    },
+    {
+      "description": "Read the carts of one shopper, newest first, optionally of one state (OPEN, CHECKED_OUT, ABANDONED or MERGED). Each entry is the same document get_cart returns. The same answer as GET /carts?shopperId=&state= with every page followed (up to 1000 carts, the newest). A shopper with no carts gets an empty list, not a problem. Persists nothing.",
+      "examples": [
+        "{\"skill\":\"list_shopper_carts\",\"arguments\":{\"shopperId\":\"shopper-42\"}}",
+        "{\"skill\":\"list_shopper_carts\",\"arguments\":{\"shopperId\":\"shopper-42\",\"state\":\"OPEN\"}}"
+      ],
+      "id": "list_shopper_carts",
+      "inputModes": [
+        "application/json"
+      ],
+      "name": "List a shopper's carts",
+      "tags": [
+        "cart",
+        "shopper",
+        "read",
+        "authority:L1"
+      ]
+    }
+  ],
+  "version": "51976ab-arm64"
+}

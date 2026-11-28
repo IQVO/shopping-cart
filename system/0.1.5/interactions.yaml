@@ -1,0 +1,154 @@
+# shopping-cart 0.1.5 (v0.1.5, 51976ab) - System Assets & Interaction Standard v0.4
+# Interactions of shopping-cart (STANDARD.md Part B): every call this context
+# MAKES (technology + operation + business) and every event it consumes.
+#
+# One synchronous call: QuoteDelivery -> delivery-promise POST /delivery-quotes
+# (CLAUDE.md hard rule 5, ADR 0001). No other rest/mcp/a2a interaction: the MCP
+# server and the A2A agent are read-only and call no sibling.
+# All four published events are analytics-only (channel
+# retailnetwork.shopping-cart.analytics, via the transactional outbox).
+apiVersion: warehouse/interactions/v1
+application: application.yaml
+
+interactions:
+
+  # --- QuoteDelivery: the cart's only outbound call
+  - id: quote-delivery-call-quote-delivery-offers
+    technology: rest
+    operation:
+      asset: delivery-promise/openapi
+      id: quoteDeliveryOffers
+      effect: write
+      rest: { method: POST, path: /delivery-quotes }
+    business:
+      capability: cart.delivery-quote
+      process: delivery-quoting
+      useCase: QuoteDelivery
+      triggers:
+        - { kind: api, via: rest, ref: quoteCartDelivery, actor: "human:shopper" }
+      purpose: Ask delivery-promise for the delivery offers of the cart's lines and destination postal prefix, outside the transaction, then store the quote on the cart.
+      criticality: blocking
+      onFailure: the cart gets no delivery quote and the shopper cannot select delivery until a later quote succeeds
+
+  # --- AddLine
+  - id: add-line-publish-cart-line-added-analytics
+    technology: event.publish
+    operation:
+      asset: shopping-cart/asyncapi
+      id: publishCartAnalytics
+      effect: write
+      event: { channel: retailnetwork.shopping-cart.analytics, type: com.retailnetwork.storefront.shopping-cart.cart.CartLineAdded }
+    business:
+      capability: cart.cart-lines
+      process: cart-building
+      useCase: AddLine
+      triggers:
+        - { kind: api, via: rest, ref: addCartLine, actor: "human:shopper" }
+      purpose: Analytics-only fact that a line was added to a cart (merged line quantity).
+      criticality: best-effort
+      onFailure: outbox-retry
+
+  # --- QuoteDelivery
+  - id: quote-delivery-publish-cart-delivery-quoted-analytics
+    technology: event.publish
+    operation:
+      asset: shopping-cart/asyncapi
+      id: publishCartAnalytics
+      effect: write
+      event: { channel: retailnetwork.shopping-cart.analytics, type: com.retailnetwork.storefront.shopping-cart.cart.CartDeliveryQuoted }
+    business:
+      capability: cart.delivery-quote
+      process: delivery-quoting
+      useCase: QuoteDelivery
+      triggers:
+        - { kind: api, via: rest, ref: quoteCartDelivery, actor: "human:shopper" }
+      purpose: Analytics-only fact that delivery offers were quoted for a cart (destination postal prefix and group count, no offer detail).
+      criticality: best-effort
+      onFailure: outbox-retry
+
+  # --- AbandonInactive (scheduled policy: cmd/api scheduler job AbandonInactive, tick ABANDON_SWEEP_INTERVAL, default 1h)
+  - id: abandon-inactive-publish-cart-abandoned-analytics
+    technology: event.publish
+    operation:
+      asset: shopping-cart/asyncapi
+      id: publishCartAnalytics
+      effect: write
+      event: { channel: retailnetwork.shopping-cart.analytics, type: com.retailnetwork.storefront.shopping-cart.cart.CartAbandoned }
+    business:
+      capability: cart.cart-lifecycle
+      process: cart-abandonment
+      useCase: AbandonInactive
+      triggers:
+        - { kind: schedule, ref: AbandonInactive, actor: system }
+      purpose: Analytics-only fact that an OPEN cart idle for 30 days was abandoned.
+      criticality: best-effort
+      onFailure: outbox-retry
+
+  # --- Consumer (CloseOnCheckoutCompleted)
+  - id: consumer-publish-cart-checked-out-analytics
+    technology: event.publish
+    operation:
+      asset: shopping-cart/asyncapi
+      id: publishCartAnalytics
+      effect: write
+      event: { channel: retailnetwork.shopping-cart.analytics, type: com.retailnetwork.storefront.shopping-cart.cart.CartCheckedOut }
+    business:
+      capability: cart.cart-lifecycle
+      process: cart-checkout-closure
+      useCase: Consumer
+      triggers:
+        - { kind: event, ref: com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted, actor: system }
+      purpose: Analytics-only fact that a cart was checked out when checkout reported CheckoutCompleted (policy CloseOnCheckoutCompleted).
+      criticality: best-effort
+      onFailure: outbox-retry
+
+subscriptions:
+
+  - id: consume-offer-availability-receive-offer-availability-events
+    operation:
+      asset: offer-availability/asyncapi
+      id: publishOfferAvailabilityEvents
+      consumerOperation: receiveOfferAvailabilityEvents
+      event:
+        channel: retailnetwork.offer-availability.events
+        types:
+          - com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemCreated
+          - com.retailnetwork.commerce.offer-availability.catalogitem.CatalogItemDiscontinued
+    business:
+      capability: cart.purchasability
+      process: purchasability-tracking
+      useCases: [Consumer]
+      purpose: Keep PurchasabilityView current (item catalogued or discontinued) so a discontinued item cannot be added to a cart.
+
+  - id: consume-pricing-receive-pricing-events
+    operation:
+      asset: pricing/asyncapi
+      id: publishPricingEvents
+      consumerOperation: receivePricingEvents
+      event:
+        channel: retailnetwork.pricing.events
+        types:
+          - com.retailnetwork.storefront.pricing.itemprice.ItemPriceChanged
+          - com.retailnetwork.storefront.pricing.itemprice.ItemPriceWithdrawn
+          - com.retailnetwork.storefront.pricing.deliverychargeschedule.DeliveryChargeScheduleChanged
+          - com.retailnetwork.storefront.pricing.taxtable.TaxTableChanged
+    business:
+      capability: cart.estimate
+      process: estimate-pricing-inputs
+      useCases: [Consumer]
+      purpose: Keep item prices, the delivery charge schedule and the tax table current in PurchasabilityView and EstimateView for the labelled, non-binding estimate.
+
+  - id: consume-checkout-receive-checkout-events
+    operation:
+      asset: checkout/asyncapi
+      id: publishCheckoutEvents
+      consumerOperation: receiveCheckoutEvents
+      event:
+        channel: retailnetwork.checkout.events
+        types:
+          - com.retailnetwork.storefront.checkout.checkoutsession.CheckoutCompleted
+    business:
+      capability: cart.cart-lifecycle
+      process: cart-checkout-closure
+      useCases: [Consumer]
+      purpose: Close the cart named by CheckoutCompleted (CHECKED_OUT) and raise CartCheckedOut (policy CloseOnCheckoutCompleted).
